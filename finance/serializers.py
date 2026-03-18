@@ -1,6 +1,29 @@
 from rest_framework import serializers
 from django.db.models import Sum
+from django.contrib.auth.models import User
 from .models import School, ClassLevel, Term, FeeStructure, Student, Payment
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    school_name = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password', 'school_name']
+
+    def create(self, validated_data):
+        school_name = validated_data.pop('school_name')
+        password = validated_data.pop('password')
+        
+        user = User.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
+        
+        # Create the associated school
+        School.objects.create(name=school_name, created_by=user)
+        
+        return user
 
 
 class SchoolSerializer(serializers.ModelSerializer):

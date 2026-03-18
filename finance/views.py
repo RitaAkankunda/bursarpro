@@ -1,15 +1,21 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Sum, Count, Q
 from .models import School, ClassLevel, Term, FeeStructure, Student, Payment
 from .serializers import (
     SchoolSerializer, ClassLevelSerializer, TermSerializer,
-    FeeStructureSerializer, StudentSerializer, PaymentSerializer
+    FeeStructureSerializer, StudentSerializer, PaymentSerializer,
+    UserRegistrationSerializer
 )
 from .utils import send_payment_sms, render_to_pdf
 from django.http import HttpResponse
+
+
+class RegisterView(generics.CreateAPIView):
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
 
 
 class SchoolViewSet(viewsets.ModelViewSet):

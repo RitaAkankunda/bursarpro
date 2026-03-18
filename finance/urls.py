@@ -16,5 +16,6 @@ router.register(r'payments', PaymentViewSet, basename='payment')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 
 urlpatterns = [
+    path('auth/register/', views.RegisterView.as_view(), name='register'),
     path('', include(router.urls)),
 ]
