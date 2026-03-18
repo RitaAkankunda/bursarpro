@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 class School(models.Model):
     name = models.CharField(max_length=255)
@@ -58,8 +59,7 @@ class Payment(models.Model):
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='CASH')
     receipt_number = models.CharField(max_length=50, unique=True)
     
-    # We will import User at the top to track who recorded this!
-    # recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
