@@ -1,4 +1,4 @@
-﻿africastalking==2.0.2
+africastalking==2.0.2
 arabic-reshaper==3.0.0
 asgiref==3.11.1
 asn1crypto==1.5.1
@@ -11,6 +11,7 @@ dj-database-url==3.1.2
 Django==6.0.3
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
+django-cors-headers==4.7.0
 freetype-py==2.5.1
 html5lib==1.1
 idna==3.11

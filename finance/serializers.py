@@ -81,6 +81,7 @@ class StudentSerializer(serializers.ModelSerializer):
     """
     class_level_name = serializers.CharField(source='class_level.name', read_only=True)
     school_name = serializers.CharField(source='school.name', read_only=True)
+    school = serializers.PrimaryKeyRelatedField(read_only=True)
     full_name = serializers.SerializerMethodField()
     balance = serializers.SerializerMethodField()
 

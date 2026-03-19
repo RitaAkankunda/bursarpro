@@ -29,10 +29,12 @@ def send_payment_sms(payment):
 
     if not api_key or not username:
         # SMS not configured, skip silently
+        print("[SMS] No credentials configured (using sandbox)")
         return
 
     try:
         import africastalking
+        print(f"[SMS] Initializing Africa's Talking with username: {username}")
         africastalking.initialize(username, api_key)
         sms = africastalking.SMS
 
@@ -48,7 +50,13 @@ def send_payment_sms(payment):
         if not phone.startswith('+'):
             phone = '+256' + phone.lstrip('0')
 
-        sms.send(message, [phone])
+        print(f"[SMS] Sending SMS to {phone}")
+        print(f"[SMS] Message: {message}")
+        response = sms.send(message, [phone])
+        print(f"[SMS] Response: {response}")
+        print("[SMS] ✓ SMS sent successfully!")
     except Exception as e:
         # Log error but don't crash the payment flow
         print(f"[SMS ERROR] Could not send SMS: {e}")
+        import traceback
+        traceback.print_exc()

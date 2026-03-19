@@ -19,9 +19,21 @@ class RegisterView(generics.CreateAPIView):
 
 
 class SchoolViewSet(viewsets.ModelViewSet):
-    queryset = School.objects.all()
     serializer_class = SchoolSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Users only see schools they created
+        return School.objects.filter(created_by=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def my_school(self, request):
+        """Get the current user's school (first one if multiple)"""
+        school = School.objects.filter(created_by=request.user).first()
+        if school:
+            serializer = self.get_serializer(school)
+            return Response(serializer.data)
+        return Response({'error': 'No school found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class ClassLevelViewSet(viewsets.ModelViewSet):
@@ -29,7 +41,9 @@ class ClassLevelViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = ClassLevel.objects.all()
+        # Auto-filter by user's school
+        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+        qs = ClassLevel.objects.filter(school_id__in=user_schools)
         school_id = self.request.query_params.get('school_id')
         if school_id:
             qs = qs.filter(school_id=school_id)
@@ -41,7 +55,9 @@ class TermViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Term.objects.all()
+        # Auto-filter by user's school
+        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+        qs = Term.objects.filter(school_id__in=user_schools)
         school_id = self.request.query_params.get('school_id')
         if school_id:
             qs = qs.filter(school_id=school_id)
@@ -65,7 +81,9 @@ class StudentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Student.objects.all()
+        # Auto-filter by user's school
+        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+        qs = Student.objects.filter(school_id__in=user_schools)
         school_id = self.request.query_params.get('school_id')
         class_level_id = self.request.query_params.get('class_level_id')
         search = self.request.query_params.get('search')
@@ -82,6 +100,17 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
         return qs
 
+    def perform_create(self, serializer):
+        # Auto-assign student to user's school
+        user_school = School.objects.filter(created_by=self.request.user).first()
+        if user_school:
+            serializer.save(school=user_school)
+        else:
+            return Response(
+                {'error': 'No school associated with user. Please create a school first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
@@ -93,7 +122,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Payment.objects.select_related('student', 'term', 'recorded_by').all()
+        # Auto-filter by user's school
+        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+        qs = Payment.objects.select_related('student', 'term', 'recorded_by').filter(student__school_id__in=user_schools)
         student_id = self.request.query_params.get('student_id')
         term_id = self.request.query_params.get('term_id')
 
