@@ -159,3 +159,24 @@ class NotificationPreference(models.Model):
     def __str__(self):
         return f'Notification preferences for {self.user.username}'
 
+
+
+# Import additional models for Phase 8
+try:
+    from .reporting_models import ReportTemplate, ScheduledReport, ReportExecution, ReportCustomization
+    from .analytics_models import PaymentAnalytic, PaymentForecast, PaymentMethodTrend
+    from .currency_models import Currency, ExchangeRate, SchoolCurrency, MultiCurrencyPayment
+    from .refund_models import Refund, PaymentReversal, RefundNotification, AuditLog
+except ImportError:
+    # Models may not be imported if files not created yet
+    pass
+
+# Import services for Phase 8
+try:
+    from .refund_service import RefundService
+    from .reporting_service import ReportingService, EmailService
+    from .currency_service import CurrencyService
+    from .analytics_service import AnalyticsService
+except ImportError:
+    # Services may not be available yet
+    pass

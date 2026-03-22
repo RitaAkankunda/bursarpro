@@ -7,6 +7,13 @@ from .views import (
     HeadmasterDashboardViewSet, ReportViewSet, NotificationViewSet, NotificationPreferenceViewSet,
     BulkPaymentViewSet
 )
+from .phase8_viewsets import (
+    ReportTemplateViewSet, ScheduledReportViewSet, ReportExecutionViewSet,
+    ReportCustomizationViewSet, PaymentAnalyticViewSet, PaymentForecastViewSet,
+    PaymentMethodTrendViewSet, CurrencyViewSet, ExchangeRateViewSet,
+    SchoolCurrencyViewSet, MultiCurrencyPaymentViewSet, RefundViewSet,
+    PaymentReversalViewSet, RefundNotificationViewSet, AuditLogViewSet
+)
 
 router = DefaultRouter()
 router.register(r'schools', SchoolViewSet, basename='school')
@@ -23,6 +30,30 @@ router.register(r'reports', ReportViewSet, basename='reports')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'notification-preferences', NotificationPreferenceViewSet, basename='notification-preference')
 router.register(r'bulk-payments', BulkPaymentViewSet, basename='bulk-payment')
+
+# Phase 8 Endpoints
+# Reporting
+router.register(r'report-templates', ReportTemplateViewSet, basename='report-template')
+router.register(r'scheduled-reports', ScheduledReportViewSet, basename='scheduled-report')
+router.register(r'report-executions', ReportExecutionViewSet, basename='report-execution')
+router.register(r'report-customizations', ReportCustomizationViewSet, basename='report-customization')
+
+# Analytics
+router.register(r'payment-analytics', PaymentAnalyticViewSet, basename='payment-analytic')
+router.register(r'payment-forecasts', PaymentForecastViewSet, basename='payment-forecast')
+router.register(r'payment-method-trends', PaymentMethodTrendViewSet, basename='payment-method-trend')
+
+# Currency
+router.register(r'currencies', CurrencyViewSet, basename='currency')
+router.register(r'exchange-rates', ExchangeRateViewSet, basename='exchange-rate')
+router.register(r'school-currencies', SchoolCurrencyViewSet, basename='school-currency')
+router.register(r'multi-currency-payments', MultiCurrencyPaymentViewSet, basename='multi-currency-payment')
+
+# Refunds
+router.register(r'refunds', RefundViewSet, basename='refund')
+router.register(r'payment-reversals', PaymentReversalViewSet, basename='payment-reversal')
+router.register(r'refund-notifications', RefundNotificationViewSet, basename='refund-notification')
+router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
 
 urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='register'),
