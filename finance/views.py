@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Sum, Count, Q
 from .models import School, ClassLevel, Term, FeeStructure, Student, Payment, UserRole, Notification, NotificationPreference
 from .serializers import (
@@ -25,6 +26,10 @@ from reportlab.lib import colors
 from datetime import datetime, timedelta
 import csv
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegistrationSerializer
@@ -229,6 +234,7 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         # Get user's school from their role
@@ -278,10 +284,45 @@ class StudentViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('no_paginate') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
+        
+    @action(detail=False, methods=['post'])
+    def send_reminders(self, request):
+        term_id = request.data.get('term_id')
+        if not term_id:
+            return Response({"detail": "term_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        students = self.get_queryset()
+        reminders_sent = 0
+        from .notification_service import SMSService
+        
+        for student in students:
+            # Calculate expected fee
+            fee_structures = FeeStructure.objects.filter(term_id=term_id, class_level=student.class_level)
+            expected = sum(f.amount for f in fee_structures)
+            
+            # Calculate total paid
+            payments = Payment.objects.filter(student=student, term_id=term_id)
+            paid = payments.aggregate(total=Sum('amount'))['total'] or 0
+            
+            balance = expected - paid
+            if balance > 0 and student.parent_phone:
+                SMSService.send_outstanding_fees_alert(student, balance)
+                reminders_sent += 1
+                
+        return Response({
+            "detail": f"Successfully dispatched {reminders_sent} SMS reminders.",
+            "count": reminders_sent
+        }, status=status.HTTP_200_OK)
+
 
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         # Get user's school from their role
@@ -303,15 +344,29 @@ class PaymentViewSet(viewsets.ModelViewSet):
             qs = qs.filter(term_id=term_id)
         return qs.order_by('-payment_date')
 
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('no_paginate') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
+
     def perform_create(self, serializer):
         payment = serializer.save(recorded_by=self.request.user)
-        # Send SMS & Email notifications (SMS is the core Phase 6 feature)
         try:
             # Try the new SMS service first
             SMSService.send_payment_confirmation(payment, payment.student.parent_phone)
+            
+            # create notification record in DB
+            from .models import Notification
+            Notification.objects.create(
+                user=self.request.user,
+                title="Payment Receipt Sent",
+                message=f"SMS receipt for {payment.receipt_number} dispatched to {payment.student.parent_name}.",
+                type='info'
+            )
         except Exception as e:
             # Fallback to old method if new service fails
             try:
+                from .utils import send_payment_sms
                 send_payment_sms(payment)
             except Exception:
                 pass  # SMS failure should not block payment recording
@@ -593,6 +648,41 @@ class StudentBalanceViewSet(viewsets.ViewSet):
             {'error': 'Failed to generate PDF'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+    @action(detail=False, methods=['post'], url_path='pay_online')
+    def pay_online(self, request):
+        """Simulate an online payment via Student Portal Checkout"""
+        parent_role = UserRole.objects.filter(user=request.user, role='PARENT').first()
+        if not parent_role or not parent_role.student:
+            return Response({'error': 'Unauthorized access'}, status=status.HTTP_403_FORBIDDEN)
+
+        amount = request.data.get('amount')
+        if not amount:
+            return Response({'error': 'Payment amount is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        student = parent_role.student
+        term = Term.objects.filter(school=student.school).order_by('-end_date').first()
+
+        try:
+            payment = Payment.objects.create(
+                student=student,
+                term=term,
+                amount=amount,
+                payment_method='MOBILE_MONEY',
+                recorded_by=request.user
+            )
+            
+            # Dispatch the SMS receipt automatically
+            from .notification_service import SMSService
+            SMSService.send_payment_confirmation(payment, student.parent_phone)
+
+            return Response({
+                'message': 'Online Payment processed successfully',
+                'receipt': payment.receipt_number
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 

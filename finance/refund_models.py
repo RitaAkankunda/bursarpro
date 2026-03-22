@@ -145,6 +145,7 @@ class AuditLog(models.Model):
     ACTION_TYPES = [
         ('CREATE', 'Created'),
         ('UPDATE', 'Updated'),
+        ('DELETE', 'Deleted'),
         ('APPROVE', 'Approved'),
         ('REJECT', 'Rejected'),
         ('PROCESS', 'Processed'),
@@ -154,7 +155,13 @@ class AuditLog(models.Model):
     
     # Log details
     action = models.CharField(max_length=20, choices=ACTION_TYPES)
-    entity_type = models.CharField(max_length=20, choices=[('REFUND', 'Refund'), ('REVERSAL', 'Reversal')])
+    entity_type = models.CharField(max_length=20, choices=[
+        ('REFUND', 'Refund'), 
+        ('REVERSAL', 'Reversal'),
+        ('PAYMENT', 'Payment'),
+        ('STUDENT', 'Student'),
+        ('USER', 'User')
+    ])
     entity_id = models.IntegerField()
     
     # Who did it

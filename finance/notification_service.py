@@ -7,7 +7,11 @@ from datetime import datetime
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-import africastalking
+
+try:
+    import africastalking
+except ImportError:
+    africastalking = None
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +19,7 @@ logger = logging.getLogger(__name__)
 af_api_key = getattr(settings, 'AFRICAS_TALKING_API_KEY', '')
 af_username = getattr(settings, 'AFRICAS_TALKING_USERNAME', '')
 
-if af_api_key and af_username:
+if africastalking and af_api_key and af_username:
     africastalking.initialize(af_username, af_api_key)
     sms = africastalking.SMS
 else:
@@ -29,14 +33,14 @@ class SMSService:
     def send_payment_confirmation(payment, parent_phone):
         """Send SMS notification when payment is received"""
         if not sms:
-            logger.warning("SMS service not configured")
+            logger.info(f"\n[MOCK SMS] [{parent_phone}] Fee Payment Received: UGX {payment.amount:,.0f} for {payment.student.first_name} {payment.student.last_name}\n")
             return None
         
         try:
             message = (
                 f"Fee Payment Received\n"
                 f"Student: {payment.student.first_name} {payment.student.last_name}\n"
-                f"Amount: KES {payment.amount:,.0f}\n"
+                f"Amount: UGX {payment.amount:,.0f}\n"
                 f"Receipt: {payment.receipt_number}\n"
                 f"Date: {payment.payment_date.strftime('%Y-%m-%d %H:%M')}"
             )
@@ -54,14 +58,14 @@ class SMSService:
     def send_outstanding_fees_alert(student, amount_outstanding):
         """Send SMS alert for outstanding fees"""
         if not sms or not student.parent_phone:
-            logger.warning("SMS service not configured or no parent phone")
+            logger.info(f"\n[MOCK SMS] [{student.parent_phone}] Outstanding Alert: UGX {amount_outstanding:,.0f} for {student.first_name} {student.last_name}\n")
             return None
         
         try:
             message = (
                 f"Outstanding Fees Alert\n"
                 f"Student: {student.first_name} {student.last_name}\n"
-                f"Amount Outstanding: KES {amount_outstanding:,.0f}\n"
+                f"Amount Outstanding: UGX {amount_outstanding:,.0f}\n"
                 f"Please settle this amount promptly.\n"
                 f"School: {student.school.name}"
             )
@@ -89,7 +93,7 @@ class EmailService:
                 f"We have received your payment for {payment.student.first_name} {payment.student.last_name}.\n\n"
                 f"Payment Details:\n"
                 f"- Receipt Number: {payment.receipt_number}\n"
-                f"- Amount: KES {payment.amount:,.2f}\n"
+                f"- Amount: UGX {payment.amount:,.0f}\n"
                 f"- Date: {payment.payment_date.strftime('%Y-%m-%d %H:%M:%S')}\n"
                 f"- School: {payment.student.school.name}\n\n"
                 f"Thank you for your prompt payment.\n\n"
@@ -141,9 +145,9 @@ class EmailService:
             
             message = "Dear Administrator,\n\nOutstanding Fees Summary:\n\n"
             for student in outstanding_list:
-                message += f"- {student['name']} ({student['class']}): KES {student['outstanding']:,.2f}\n"
+                message += f"- {student['name']} ({student['class']}): UGX {student['outstanding']:,.0f}\n"
             
-            message += f"\nTotal Outstanding: KES {sum(s['outstanding'] for s in outstanding_list):,.2f}\n\n"
+            message += f"\nTotal Outstanding: UGX {sum(s['outstanding'] for s in outstanding_list):,.0f}\n\n"
             message += "Best regards,\nFees Tracker System"
             
             send_mail(
