@@ -105,6 +105,10 @@ class SchoolViewSet(viewsets.ModelViewSet):
         # Users only see schools they created
         return School.objects.filter(created_by=self.request.user)
 
+    def perform_create(self, serializer):
+        # Automatically set created_by to current user when creating a school
+        serializer.save(created_by=self.request.user)
+
     @action(detail=False, methods=['get'])
     def my_school(self, request):
         """Get the current user's school (first one if multiple)"""
@@ -120,13 +124,35 @@ class ClassLevelViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
 
     def get_queryset(self):
-        # Auto-filter by user's school
-        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-        qs = ClassLevel.objects.filter(school_id__in=user_schools)
+        # Get user's school from their role
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            # Return all classes for their school
+            qs = ClassLevel.objects.filter(school=user_role.school)
+        else:
+            # Fallback for BURSAR - show their created schools' classes
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            qs = ClassLevel.objects.filter(school_id__in=user_schools)
+        
         school_id = self.request.query_params.get('school_id')
         if school_id:
             qs = qs.filter(school_id=school_id)
         return qs
+
+    def perform_create(self, serializer):
+        # Verify the school belongs to the current user
+        school_id = serializer.validated_data.get('school').id
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        
+        # Check if user is BURSAR or has permission for this school
+        if user_role and user_role.role == 'BURSAR':
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            if school_id not in user_schools:
+                return Response(
+                    {'error': 'You do not have permission to add classes to this school'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        serializer.save()
 
 
 class TermViewSet(viewsets.ModelViewSet):
@@ -134,13 +160,35 @@ class TermViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
 
     def get_queryset(self):
-        # Auto-filter by user's school
-        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-        qs = Term.objects.filter(school_id__in=user_schools)
+        # Get user's school from their role
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            # Return all terms for their school
+            qs = Term.objects.filter(school=user_role.school)
+        else:
+            # Fallback for BURSAR - show their created schools' terms
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            qs = Term.objects.filter(school_id__in=user_schools)
+        
         school_id = self.request.query_params.get('school_id')
         if school_id:
             qs = qs.filter(school_id=school_id)
         return qs
+
+    def perform_create(self, serializer):
+        # Verify the school belongs to the current user
+        school_id = serializer.validated_data.get('school').id
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        
+        # Check if user is BURSAR or has permission for this school
+        if user_role and user_role.role == 'BURSAR':
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            if school_id not in user_schools:
+                return Response(
+                    {'error': 'You do not have permission to add terms to this school'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        serializer.save()
 
 
 class FeeStructureViewSet(viewsets.ModelViewSet):
@@ -148,11 +196,34 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
 
     def get_queryset(self):
-        qs = FeeStructure.objects.all()
+        # Get user's school from their role
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            # Return fees for their school
+            qs = FeeStructure.objects.filter(term__school=user_role.school)
+        else:
+            # Fallback for BURSAR - show their created schools' fees
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            qs = FeeStructure.objects.filter(term__school_id__in=user_schools)
+        
         term_id = self.request.query_params.get('term_id')
+        class_level_id = self.request.query_params.get('class_level_id')
         if term_id:
             qs = qs.filter(term_id=term_id)
+        if class_level_id:
+            qs = qs.filter(class_level_id=class_level_id)
         return qs
+
+    def perform_create(self, serializer):
+        # Verify term belongs to user's school
+        term = serializer.validated_data.get('term')
+        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+        if term.school_id not in user_schools:
+            return Response(
+                {'error': 'You cannot add fees to terms in other schools'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer.save()
 
 
 class StudentViewSet(viewsets.ModelViewSet):
@@ -160,9 +231,16 @@ class StudentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
 
     def get_queryset(self):
-        # Auto-filter by user's school
-        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-        qs = Student.objects.filter(school_id__in=user_schools)
+        # Get user's school from their role
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            # Return all students for their school
+            qs = Student.objects.filter(school=user_role.school)
+        else:
+            # Fallback for BURSAR - show their created schools' students
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            qs = Student.objects.filter(school_id__in=user_schools)
+        
         school_id = self.request.query_params.get('school_id')
         class_level_id = self.request.query_params.get('class_level_id')
         search = self.request.query_params.get('search')
@@ -181,12 +259,17 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Auto-assign student to user's school
-        user_school = School.objects.filter(created_by=self.request.user).first()
-        if user_school:
-            serializer.save(school=user_school)
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            serializer.save(school=user_role.school)
         else:
-            return Response(
-                {'error': 'No school associated with user. Please create a school first.'},
+            # Fallback for BURSAR
+            user_school = School.objects.filter(created_by=self.request.user).first()
+            if user_school:
+                serializer.save(school=user_school)
+            else:
+                return Response(
+                    {'error': 'No school associated with user. Please create a school first.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -201,9 +284,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
 
     def get_queryset(self):
-        # Auto-filter by user's school
-        user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-        qs = Payment.objects.select_related('student', 'term', 'recorded_by').filter(student__school_id__in=user_schools)
+        # Get user's school from their role
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role and user_role.school:
+            # Return all payments for their school
+            qs = Payment.objects.select_related('student', 'term', 'recorded_by').filter(student__school=user_role.school)
+        else:
+            # Fallback for BURSAR - show their created schools' payments
+            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
+            qs = Payment.objects.select_related('student', 'term', 'recorded_by').filter(student__school_id__in=user_schools)
+        
         student_id = self.request.query_params.get('student_id')
         term_id = self.request.query_params.get('term_id')
 
@@ -503,110 +593,6 @@ class StudentBalanceViewSet(viewsets.ViewSet):
             {'error': 'Failed to generate PDF'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-
-class HeadmasterDashboardViewSet(viewsets.ViewSet):
-    """
-    Headmaster dashboard with system-wide reports.
-    - Headmasters see read-only reports across all schools
-    - Shows collection analytics, unpaid students, payment trends
-    """
-    permission_classes = [IsAuthenticated]
-
-    def list(self, request):
-        """Get headmaster dashboard overview for all schools"""
-        term_id = request.query_params.get('term_id')
-
-        if not term_id:
-            # Get current/latest term
-            term = Term.objects.order_by('-end_date').first()
-            if not term:
-                return Response(
-                    {'error': 'No active term found'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            term_id = term.id
-        else:
-            try:
-                term = Term.objects.get(id=term_id)
-            except Term.DoesNotExist:
-                return Response(
-                    {'error': 'Term not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-        # Get all schools
-        schools = School.objects.all()
-        
-        # System-wide totals
-        total_students = Student.objects.count()
-        total_schools = schools.count()
-        
-        # Get all payments for this term
-        payments = Payment.objects.filter(term=term)
-        total_collected = float(payments.aggregate(total=Sum('amount'))['total'] or 0)
-        
-        # Get all fee structures for this term
-        fee_structures = FeeStructure.objects.filter(term=term)
-        total_expected = 0
-        for fee in fee_structures:
-            students_count = Student.objects.filter(class_level=fee.class_level).count()
-            total_expected += float(fee.amount) * students_count
-        
-        total_outstanding = total_expected - total_collected
-        
-        # Students who paid this term
-        paid_students = payments.values('student').distinct().count()
-        unpaid_students = total_students - paid_students
-        
-        # Per-school breakdown
-        schools_data = []
-        for school in schools:
-            school_students_count = Student.objects.filter(school=school).count()
-            school_payments = payments.filter(student__school=school)
-            school_collected = float(school_payments.aggregate(total=Sum('amount'))['total'] or 0)
-            
-            # School expected
-            school_fees = fee_structures.filter(term__school=school)
-            school_expected = 0
-            for fee in school_fees:
-                school_students_per_class = Student.objects.filter(
-                    school=school,
-                    class_level=fee.class_level
-                ).count()
-                school_expected += float(fee.amount) * school_students_per_class
-            
-            school_paid_students = school_payments.values('student').distinct().count()
-            school_unpaid = school_students_count - school_paid_students
-            school_rate = (school_collected / school_expected * 100) if school_expected > 0 else 0
-            
-            schools_data.append({
-                'id': school.id,
-                'name': school.name,
-                'total_students': school_students_count,
-                'students_with_payments': school_paid_students,
-                'students_without_payments': school_unpaid,
-                'total_collected': round(school_collected, 2),
-                'total_expected': round(school_expected, 2),
-                'total_outstanding': round(school_expected - school_collected, 2),
-                'collection_rate_percent': round(school_rate, 1),
-            })
-        
-        collection_rate = (total_collected / total_expected * 100) if total_expected > 0 else 0
-        
-        return Response({
-            'term_id': term_id,
-            'term_name': term.name,
-            'total_schools': total_schools,
-            'total_students': total_students,
-            'students_with_payments': paid_students,
-            'students_without_payments': unpaid_students,
-            'total_expected': round(total_expected, 2),
-            'total_collected': round(total_collected, 2),
-            'total_outstanding': round(total_outstanding, 2),
-            'collection_rate_percent': round(collection_rate, 1),
-            'schools': schools_data,
-        })
 
 
 
@@ -971,6 +957,95 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
             'report': students_report
 
+        })
+
+
+class TeacherDashboardViewSet(viewsets.ViewSet):
+    """
+    Teacher dashboard showing classes and students.
+    Teachers can view classes and students in their school.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        """Get teacher dashboard overview"""
+        # Get teacher's school
+        teacher_role = UserRole.objects.filter(user=request.user, role='TEACHER').first()
+        
+        if not teacher_role or not teacher_role.school:
+            return Response(
+                {'error': 'Teacher account not properly configured'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        school = teacher_role.school
+        term_id = request.query_params.get('term_id')
+
+        if not term_id:
+            # Get current/latest term
+            term = Term.objects.filter(school=school).order_by('-end_date').first()
+            if not term:
+                return Response(
+                    {'error': 'No active term found'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            term_id = term.id
+        else:
+            try:
+                term = Term.objects.get(id=term_id, school=school)
+            except Term.DoesNotExist:
+                return Response(
+                    {'error': 'Term not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Get all classes in school
+        classes = ClassLevel.objects.filter(school=school)
+        
+        # Build class details with students
+        classes_data = []
+        for cls in classes:
+            students = Student.objects.filter(school=school, class_level=cls)
+            fee_structure = FeeStructure.objects.filter(term=term, class_level=cls).first()
+            
+            # Calculate class stats
+            total_students = students.count()
+            payments = Payment.objects.filter(
+                student__in=students,
+                term=term
+            )
+            students_paid = payments.values('student').distinct().count()
+            students_unpaid = total_students - students_paid
+            total_collected = float(payments.aggregate(total=Sum('amount'))['total'] or 0)
+            
+            classes_data.append({
+                'id': cls.id,
+                'name': cls.name,
+                'total_students': total_students,
+                'students_paid': students_paid,
+                'students_unpaid': students_unpaid,
+                'fee_amount': float(fee_structure.amount) if fee_structure else 0,
+                'total_collected': round(total_collected, 2),
+                'students': [
+                    {
+                        'id': s.id,
+                        'name': f"{s.first_name} {s.last_name}",
+                        'student_id': s.student_id,
+                    }
+                    for s in students
+                ]
+            })
+
+        # Terms for dropdown
+        terms = Term.objects.filter(school=school).order_by('-start_date').values('id', 'name')
+
+        return Response({
+            'term': term.name,
+            'term_id': term.id,
+            'school': school.name,
+            'classes': classes_data,
+            'terms': list(terms),
+            'total_classes': len(classes_data),
         })
 
 

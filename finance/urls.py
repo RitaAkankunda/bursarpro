@@ -4,7 +4,7 @@ from .views import (
     SchoolViewSet, ClassLevelViewSet, TermViewSet,
     FeeStructureViewSet, StudentViewSet, PaymentViewSet,
     DashboardViewSet, RegisterView, UserRoleViewSet, ParentPINAuthView, StudentBalanceViewSet,
-    HeadmasterDashboardViewSet, ReportViewSet, NotificationViewSet, NotificationPreferenceViewSet,
+    HeadmasterDashboardViewSet, TeacherDashboardViewSet, ReportViewSet, NotificationViewSet, NotificationPreferenceViewSet,
     BulkPaymentViewSet
 )
 from .phase8_viewsets import (
@@ -26,6 +26,7 @@ router.register(r'user-roles', UserRoleViewSet, basename='userrole')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'student-balance', StudentBalanceViewSet, basename='student-balance')
 router.register(r'headmaster-dashboard', HeadmasterDashboardViewSet, basename='headmaster-dashboard')
+router.register(r'teacher-dashboard', TeacherDashboardViewSet, basename='teacher-dashboard')
 router.register(r'reports', ReportViewSet, basename='reports')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'notification-preferences', NotificationPreferenceViewSet, basename='notification-preference')
