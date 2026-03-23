@@ -248,7 +248,7 @@ class RefundViewSet(viewsets.ModelViewSet):
     serializer_class = RefundSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['payment__school', 'status', 'refund_method']
+    filterset_fields = ['payment', 'status', 'refund_method']
     ordering_fields = ['requested_at']
     ordering = ['-requested_at']
     
@@ -308,7 +308,7 @@ class PaymentReversalViewSet(viewsets.ModelViewSet):
     serializer_class = PaymentReversalSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['payment__school', 'status']
+    filterset_fields = ['payment', 'status']
     ordering_fields = ['requested_at']
     ordering = ['-requested_at']
     
