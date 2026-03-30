@@ -401,7 +401,7 @@ const Landing = () => {
 
         {/* Final CTA */}
         <section className="py-20 relative mb-32">
-          <div className="backdrop-blur-xl bg-gradient-to-r from-orange-600 to-amber-600 border border-orange-400/30 rounded-3xl p-16 overflow-hidden relative shadow-2xl">
+          <div className="backdrop-blur-xl bg-gradient-to-r from-orange-500 to-amber-500 border border-orange-400/30 rounded-3xl p-16 overflow-hidden relative shadow-2xl">
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
