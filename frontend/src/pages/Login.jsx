@@ -30,15 +30,24 @@ const Login = () => {
     try {
       await authService.login(username, password);
       
+      // Wait a moment for role to be set, then check
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       toast.success('Successfully logged in!');
       
       // Get user role and redirect accordingly
       const userRole = localStorage.getItem('userRole');
+      console.log('User role after login:', userRole);
+      
       if (userRole === 'HEADMASTER') {
         navigate('/headmaster-dashboard');
       } else if (userRole === 'TEACHER') {
         navigate('/teacher-dashboard');
+      } else if (userRole === 'BURSAR' || userRole === 'ACCOUNTANT') {
+        navigate('/dashboard');
       } else {
+        // Fallback: if role not found, redirect to dashboard anyway
+        console.warn('User role not found, redirecting to dashboard');
         navigate('/dashboard');
       }
     } catch (err) {

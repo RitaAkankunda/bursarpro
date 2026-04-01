@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Wallet, UserPlus, Loader2, AlertCircle, School, ArrowRight, CheckCircle2, Briefcase, Crown, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import authService from '../services/auth';
+import toast from 'react-hot-toast';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -30,6 +31,7 @@ const Register = () => {
 
     try {
       await authService.register(formData);
+      toast.success('Registration successful! Redirecting to login...');
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
@@ -136,7 +138,7 @@ const Register = () => {
               <input
                 type="text"
                 required
-                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold placeholder:text-gray-600/40 hover:border-white/60"
+                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold text-gray-900 placeholder:text-gray-600/40 hover:border-white/60"
                 placeholder="e.g. greenhill_admin"
                 value={formData.username}
                 onChange={(e) => setFormData({...formData, username: e.target.value})}
@@ -147,7 +149,7 @@ const Register = () => {
               <input
                 type="email"
                 required
-                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold placeholder:text-gray-600/40 hover:border-white/60"
+                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold text-gray-900 placeholder:text-gray-600/40 hover:border-white/60"
                 placeholder="admin@school.com"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -158,7 +160,7 @@ const Register = () => {
               <input
                 type="password"
                 required
-                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold placeholder:text-gray-600/40 hover:border-white/60"
+                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold text-gray-900 placeholder:text-gray-600/40 hover:border-white/60"
                 placeholder="••••••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -169,7 +171,7 @@ const Register = () => {
               <input
                 type="text"
                 required
-                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold placeholder:text-gray-600/40 hover:border-white/60"
+                className="w-full px-6 py-5 bg-white/50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/60 focus:bg-white/70 border border-white/40 transition-all text-sm font-bold text-gray-900 placeholder:text-gray-600/40 hover:border-white/60"
                 placeholder="e.g. St. Peters SS"
                 value={formData.school_name}
                 onChange={(e) => setFormData({...formData, school_name: e.target.value})}

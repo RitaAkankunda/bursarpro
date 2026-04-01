@@ -169,20 +169,111 @@ const HeadmasterDashboard = () => {
     return (
       <DashboardLayout>
         <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <div className="flex flex-col items-center justify-center backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 shadow-2xl p-12 max-w-md text-center space-y-6">
-            <div className="p-4 bg-red-500/10 rounded-full">
-              <AlertCircle className="w-16 h-16 text-red-500" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-black tracking-tight text-white">No Active Terms</h2>
-              <p className="text-text-muted max-w-md font-medium">You need to set up academic terms before viewing dashboard statistics.</p>
-            </div>
-            <button 
-              onClick={() => navigate('/settings')} 
-              className="px-8 py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg active:scale-95 w-full flex items-center justify-center gap-2"
+          <div className="w-full max-w-2xl space-y-8">
+            {/* Welcome Header */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center space-y-3"
             >
-              Go to Settings <ChevronRight size={18} />
-            </button>
+              <h1 className="text-4xl font-black text-gray-800">Welcome Headmaster!</h1>
+              <p className="text-gray-600 text-lg">Let's get your dashboard ready to track school finances</p>
+            </motion.div>
+
+            {/* Setup Steps */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="backdrop-blur-md bg-white/60 rounded-2xl border border-white/30 shadow-lg p-8 space-y-6"
+            >
+              <h2 className="text-2xl font-bold text-gray-800">3 Quick Steps to Get Started</h2>
+              
+              <div className="space-y-4">
+                {[
+                  {
+                    step: "1",
+                    title: "Create Academic Terms",
+                    desc: "Define your school's academic calendar (e.g., Term 1, Term 2, Term 3)",
+                    icon: Calendar,
+                    action: "Start Setup"
+                  },
+                  {
+                    step: "2",
+                    title: "Set Up Schools",
+                    desc: "If managing multiple schools, configure each one in your system",
+                    icon: Building2,
+                    action: "Go to Settings"
+                  },
+                  {
+                    step: "3",
+                    title: "View Analytics",
+                    desc: "Monitor student payments, collection rates, and financial reports",
+                    icon: BarChart3,
+                    action: "Dashboard"
+                  }
+                ].map(({ step, title, desc, icon: Icon }, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 + idx * 0.1 }}
+                    className="flex gap-4 p-4 bg-white/40 rounded-xl border border-white/20 group hover:border-orange-500/30 transition-all"
+                  >
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-orange-500/20 flex-shrink-0 group-hover:bg-orange-500/30 transition-all">
+                      <span className="font-black text-orange-600 text-lg">{step}</span>
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <h3 className="font-bold text-gray-800">{title}</h3>
+                      <p className="text-sm text-gray-600">{desc}</p>
+                    </div>
+                    <Icon size={20} className="text-orange-500 flex-shrink-0" />
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Preview Cards */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="space-y-3"
+            >
+              <p className="text-sm font-bold text-gray-700 uppercase tracking-wide">You'll See This Once Set Up:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { label: "Total Students", value: "---" },
+                  { label: "Collection Rate", value: "---" },
+                  { label: "Amount Collected", value: "---" },
+                  { label: "Outstanding Fees", value: "---" }
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="backdrop-blur-md bg-white/40 rounded-xl p-4 border border-white/20 text-center"
+                  >
+                    <p className="text-xs text-gray-600 font-bold uppercase">{item.label}</p>
+                    <p className="text-2xl font-black text-gray-400 mt-2">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            {/* Action Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="flex justify-center"
+            >
+              <button 
+                onClick={() => navigate('/settings')} 
+                className="px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Calendar size={20} />
+                Go to Settings
+              </button>
+            </motion.div>
           </div>
         </div>
       </DashboardLayout>
@@ -228,101 +319,177 @@ const HeadmasterDashboard = () => {
 
         {data && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard 
-                title="Total Students"
-                value={data.total_students}
-                icon={<Users size={24} />}
-                color="orange-400"
-                delay={0.1}
-              />
-              <StatCard 
-                title="Paid Students"
-                value={data.students_paid}
-                icon={<CheckCircle2 size={24} />}
-                color="emerald-400"
-                delay={0.2}
-              />
-              <StatCard 
-                title="Total Collected"
-                value={data.total_collected}
-                icon={<TrendingUp size={24} />}
-                color="primary"
-                delay={0.3}
-              />
-              <StatCard 
-                title="Outstanding"
-                value={data.total_outstanding}
-                icon={<AlertCircle size={24} />}
-                color="accent"
-                delay={0.4}
-              />
+            {/* Network Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Schools Managed</p>
+                  <Building2 className="w-5 h-5 text-orange-600" />
+                </div>
+                <p className="text-4xl font-black text-gray-800">{data.number_of_schools}</p>
+                <p className="text-xs text-gray-600 mt-2">Active institutions</p>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Network Collection Rate</p>
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+                <p className="text-4xl font-black text-gray-800">{data.overall_collection_rate}%</p>
+                <p className="text-xs text-gray-600 mt-2">Average across all schools</p>
+              </motion.div>
+
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Total Network Revenue</p>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <p className="text-3xl font-black text-gray-800">UGX {(data.total_collected / 1000000).toLocaleString()}M</p>
+                <p className="text-xs text-gray-600 mt-2">Collected this term</p>
+              </motion.div>
             </div>
 
+            {/* Individual School Performance */}
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold tracking-tight text-gray-800">School Performance Breakdown</h2>
+                <p className="text-gray-600">Detailed metrics for each school in your network</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {data.schools && data.schools.map((school, idx) => (
+                <motion.div
+                  key={school.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: 0.5 + idx * 0.1 }}
+                  className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg hover:shadow-xl transition-all"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-800">{school.name}</h4>
+                      <p className="text-xs text-gray-600 mt-1">{school.total_students} Students Enrolled</p>
+                    </div>
+                    <Building2 className="w-5 h-5 text-orange-600" />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 pt-4 border-t border-white/10">
+                    <div className="text-center">
+                      <p className="text-2xl font-black text-orange-500">{school.total_students}</p>
+                      <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter mt-1">Total</p>
+                    </div>
+                    <div className="text-center border-l border-r border-white/10">
+                      <p className="text-2xl font-black text-emerald-500">{school.students_with_payments}</p>
+                      <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter mt-1">Paid</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-black text-red-500">{school.students_without_payments}</p>
+                      <p className="text-[9px] text-gray-600 font-bold uppercase tracking-tighter mt-1">Unpaid</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/10 mt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-gray-600">Collection Rate</span>
+                      <span className="text-lg font-black text-orange-600">{school.collection_rate_percent}%</span>
+                    </div>
+                    <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${school.collection_rate_percent}%` }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs font-bold text-blue-900">Revenue</p>
+                    <p className="text-lg font-bold text-blue-600 mt-1">UGX {(school.total_collected / 1000000).toLocaleString()}M</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Top Performers & Alerts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <motion.div 
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8, delay: 0.5 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
                 className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg space-y-6"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold tracking-tight text-gray-800">Collection Rate</h3>
-                  <span className="text-orange-600 font-black text-2xl">{data.collection_rate_percent}%</span>
+                  <h3 className="text-xl font-bold tracking-tight text-gray-800">Top Performer</h3>
+                  <span className="text-orange-600 font-black text-lg">🏆</span>
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="h-6 w-full bg-gray-200 rounded-full overflow-hidden p-1 border border-gray-300">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${data.collection_rate_percent}%` }}
-                      transition={{ duration: 1.5, ease: "easeOut" }}
-                      className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full relative"
-                    >
-                      <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                    </motion.div>
+                {data.top_school && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                      <p className="font-bold text-gray-800 mb-2">{data.top_school.name}</p>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600">Collection Rate:</span>
+                        <span className="font-bold text-orange-600">{data.top_school.collection_rate_percent}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${data.top_school.collection_rate_percent}%` }}
+                          transition={{ duration: 1.5, ease: "easeOut" }}
+                          className="h-full bg-gradient-to-r from-orange-600 to-orange-400"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600">Leading performance this term</p>
                   </div>
-                  <div className="flex justify-between text-xs font-bold text-gray-600 uppercase tracking-widest">
-                    <span>0% Target</span>
-                    <span>100% Goal</span>
-                  </div>
-                </div>
-
-                <div className="p-6 bg-orange-100 border border-orange-200 rounded-2xl flex items-start gap-4">
-                  <div className="p-3 bg-orange-200 rounded-xl text-orange-600">
-                    <BarChart3 size={20} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-gray-800">School Performance</p>
-                    <p className="text-xs text-gray-700 leading-relaxed">{data.school_name} is at {data.collection_rate_percent}% collection rate for {data.term}. Average payment per student: UGX {data.average_payment_per_student?.toLocaleString() || 0}</p>
-                  </div>
-                </div>
+                )}
               </motion.div>
 
               <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.8, delay: 0.6 }}
-                className="lg:col-span-2 backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg flex flex-col justify-center text-center space-y-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.8 }}
+                className="lg:col-span-2 backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg"
               >
-                <div className="p-4 rounded-2xl bg-blue-100 w-fit mx-auto">
-                  <Users size={32} className="text-blue-600" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-black text-gray-800">{data.total_students}</h3>
-                  <p className="text-gray-600 uppercase tracking-widest text-xs font-bold">Total Enrolled Students</p>
-                </div>
-                <div className="flex items-center justify-center gap-6 pt-2">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-green-600">{data.students_paid}</p>
-                    <p className="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">Paid</p>
+                <h3 className="text-xl font-bold tracking-tight text-gray-800 mb-4">Attention Required</h3>
+                {data.underperforming_schools && data.underperforming_schools.length > 0 ? (
+                  <div className="space-y-3">
+                    {data.underperforming_schools.map((school, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.1 * idx }}
+                        className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="font-bold text-gray-800">{school.name}</p>
+                          <p className="text-xs text-gray-600">{school.students_without_payments} students with pending fees</p>
+                        </div>
+                        <span className="text-sm font-bold text-red-600">{school.collection_rate_percent}%</span>
+                      </motion.div>
+                    ))}
                   </div>
-                  <div className="w-px h-6 bg-gray-300" />
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-orange-600">{data.students_unpaid}</p>
-                    <p className="text-[10px] text-gray-600 font-bold uppercase tracking-tighter">Unpaid</p>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-600">All schools performing well ✓</p>
+                )}
               </motion.div>
             </div>
 
