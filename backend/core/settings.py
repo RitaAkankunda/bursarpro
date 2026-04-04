@@ -37,11 +37,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
+    "http://localhost:5176",
 ]
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # Django Channels ASGI server
+    'channels',  # Django Channels
+    
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -73,6 +77,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'core.urls'
 
+# WebSocket and HTTP routing
+WSGI_ALLOW_ASYNC_UNSAFE = True  # Allow async views in development
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -89,6 +96,24 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+ASGI_APPLICATION = 'core.asgi.application'
+
+# Django Channels Configuration
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
+
+# For production with Redis:
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             'hosts': [('redis', 6379)],
+#         },
+#     },
+# }
 
 
 # Database
