@@ -95,6 +95,41 @@ body {
   100% { background-position: 0% 50%; }
 }
 
+@keyframes blob {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes blob-delayed {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-40px, 30px) scale(0.9); }
+  66% { transform: translate(20px, -40px) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes float-up {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+  50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.3); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .animate-mesh {
   background-size: 200% 200%;
   animation: mesh 15s ease infinite;
@@ -136,4 +171,334 @@ body {
 
 .animation-delay-4000 {
   animation-delay: 4s;
+}
+
+/* Additional animations */
+.animate-float {
+  animation: float-up 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Page transitions */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+.animate-page-enter {
+  animation: page-enter 0.5s ease-out;
+}
+
+.animate-page-exit {
+  animation: page-exit 0.5s ease-in;
+}
+
+/* Enhanced interactive states */
+.interactive-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.interactive-card:active {
+  transform: scale(0.98);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  /* Typography Scaling */
+  h1 {
+    @apply text-2xl;
+  }
+  
+  h2 {
+    @apply text-xl;
+  }
+
+  h3 {
+    @apply text-lg;
+  }
+
+  /* Sidebar and Layout */
+  .sidebar-nav {
+    @apply hidden;
+  }
+
+  .sidebar-nav.open {
+    @apply block;
+  }
+
+  /* Padding and Spacing */
+  main {
+    @apply p-4 md:p-10;
+  }
+
+  /* Forms */
+  input,
+  select,
+  textarea {
+    @apply text-base;
+  }
+
+  /* Tables */
+  table {
+    @apply text-sm;
+  }
+
+  thead {
+    @apply hidden;
+  }
+
+  tr {
+    @apply block border-b border-gray-200 mb-4 rounded-lg overflow-hidden bg-white;
+  }
+
+  td {
+    @apply block text-right py-2 pl-0 pr-4 relative;
+  }
+
+  td::before {
+    content: attr(data-label);
+    @apply absolute left-0 font-bold text-gray-700 bg-gray-50 px-4 py-2 w-1/3;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg;
+  }
+
+  .glass-card {
+    @apply p-4;
+  }
+
+  /* Buttons */
+  button {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Modals */
+  .modal {
+    @apply fixed inset-0 rounded-none;
+  }
+
+  /* Dropdowns */
+  .dropdown {
+    @apply w-full;
+  }
+
+  /* Grid Layouts */
+  .grid-auto-fit {
+    @apply grid-cols-1;
+  }
+
+  .grid-2 {
+    @apply grid-cols-1;
+  }
+
+  .grid-3 {
+    @apply grid-cols-1;
+  }
+
+  .grid-4 {
+    @apply grid-cols-1 sm:grid-cols-2;
+  }
+
+  /* Gaps */
+  .gap-xl {
+    @apply gap-2;
+  }
+
+  /* Typography */
+  .text-display {
+    @apply text-2xl;
+  }
+
+  .text-headline {
+    @apply text-lg;
+  }
+
+  /* Flex */
+  .flex-responsive {
+    @apply flex-col;
+  }
+
+  /* Navigation */
+  nav {
+    @apply flex-col md:flex-row;
+  }
+
+  /* Sidebar Menu */
+  .sidebar {
+    @apply fixed left-0 top-0 h-full w-72 z-50 -translate-x-full;
+  }
+
+  .sidebar.open {
+    @apply translate-x-0;
+  }
+
+  /* Scrollbar Thumb Size */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  /* Touch-friendly spacing */
+  .touch-target {
+    @apply min-h-12 min-w-12;
+  }
+
+  /* Reduce animations on smaller screens */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Small Devices (max 480px) */
+@media (max-width: 480px) {
+  html {
+    @apply text-sm;
+  }
+
+  body {
+    @apply text-xs;
+  }
+
+  /* Extra Large Padding Becomes Medium */
+  .p-10 {
+    @apply p-3;
+  }
+
+  .p-8 {
+    @apply p-4;
+  }
+
+  /* Extra Large Gaps Become Small */
+  .gap-6 {
+    @apply gap-2;
+  }
+
+  .gap-4 {
+    @apply gap-2;
+  }
+
+  /* Column Layouts */
+  .flex-row {
+    @apply flex-col;
+  }
+
+  .flex-row-responsive {
+    @apply flex-col;
+  }
+
+  /* Font Sizes */
+  h1 {
+    @apply text-xl;
+  }
+
+  h2 {
+    @apply text-lg;
+  }
+
+  h3 {
+    @apply text-base;
+  }
+
+  /* Sidebar Width */
+  .sidebar {
+    @apply w-64;
+  }
+
+  /* Full Width Elements */
+  .max-w-md {
+    @apply max-w-none;
+  }
+
+  .max-w-lg {
+    @apply max-w-none;
+  }
+
+  .max-w-xl {
+    @apply max-w-none;
+  }
+
+  /* Chart Responsive */
+  canvas {
+    @apply max-h-64;
+  }
+
+  /* Button Groups */
+  .button-group {
+    @apply flex-col;
+  }
+
+  .button-group button {
+    @apply w-full;
+  }
+
+  /* Form Inputs */
+  input,
+  select,
+  textarea {
+    @apply w-full;
+  }
+
+  /* Notification Panel */
+  .notification-panel {
+    @apply fixed inset-0 rounded-none w-full h-full;
+  }
+}
+
+/* Medium Devices (768px to 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .grid-4 {
+    @apply grid-cols-2;
+  }
+
+  .grid-3 {
+    @apply grid-cols-2;
+  }
+}
+
+/* Large Devices (1024px and above) */
+@media (min-width: 1024px) {
+  .grid-auto-fit {
+    @apply grid-cols-4;
+  }
 }

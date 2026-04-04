@@ -1,56 +1,177 @@
 import { Link } from 'react-router-dom';
+import React from 'react';
 import { Wallet, LogIn, Users, ShieldCheck, ArrowRight, Download, CreditCard, MessageSquare, CheckCircle2, Key, Sparkles, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Text animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: (i = 1) => ({
+    opacity: 1,
+    transition: { staggerChildren: 0.12, delayChildren: 0.04 * i },
+  }),
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 300, damping: 24 },
+  },
+};
+
+// Floating animation
+const floatingVariants = {
+  initial: { y: 0 },
+  animate: {
+    y: [-20, 20, -20],
+    transition: {
+      duration: 6,
+      repeat: Infinity,
+      ease: 'easeInOut',
+    },
+  },
+};
+
+// Ripple button effect
+const RippleButton = ({ children, to, ...props }) => {
+  const [ripples, setRipples] = React.useState([]);
+
+  const addRipple = (e) => {
+    const button = e.currentTarget;
+    const size = Math.max(button.clientWidth, button.clientHeight);
+    const x = e.clientX - button.offsetLeft - size / 2;
+    const y = e.clientY - button.offsetTop - size / 2;
+    
+    const ripple = { x, y, size, id: Date.now() };
+    setRipples([ripple]);
+    
+    setTimeout(() => setRipples([]), 600);
+  };
+
+  return (
+    <Link to={to} {...props} onClick={addRipple} className="relative overflow-hidden">
+      {ripples.map((ripple) => (
+        <motion.div
+          key={ripple.id}
+          initial={{ scale: 0, opacity: 0.6 }}
+          animate={{ scale: 4, opacity: 0 }}
+          transition={{ duration: 0.6 }}
+          className="absolute rounded-full bg-white pointer-events-none"
+          style={{
+            left: ripple.x,
+            top: ripple.y,
+            width: ripple.size,
+            height: ripple.size,
+          }}
+        />
+      ))}
+      {children}
+    </Link>
+  );
+};
+
 const FeatureCard = ({ icon, svg, title, desc, delay, color = 'from-orange-500 to-amber-600' }) => (
   <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    whileInView={{ opacity: 1, y: 0 }}
+    initial={{ opacity: 0, y: 20, rotateX: -10 }}
+    whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+    whileHover={{ y: -10, scale: 1.02 }}
     transition={{ duration: 0.5, delay }}
     viewport={{ once: true }}
-    className="group relative overflow-hidden"
+    className="group relative overflow-hidden perspective"
   >
-    <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-10 transition-opacity duration-300 rounded-2xl`} />
-    
-    <div className="relative backdrop-blur-xl bg-white/10 border border-white/20 p-8 rounded-2xl shadow-lg group-hover:border-white/40 transition-all duration-300">
+    <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-20 transition-opacity duration-300 rounded-2xl blur-xl`} />
+    <motion.div 
+      whileHover={{ scale: 1.03 }}
+      className="relative backdrop-blur-xl bg-white/10 border border-white/20 p-8 rounded-2xl shadow-lg group-hover:border-white/40 transition-all duration-300"
+    >
       {svg ? (
-        <div className="w-full h-48 mb-6 rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+        <motion.div 
+          whileHover={{ scale: 1.08 }}
+          className="w-full h-48 mb-6 rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center"
+        >
           {svg}
-        </div>
+        </motion.div>
       ) : (
-        <div className={`inline-flex p-4 bg-gradient-to-br ${color} rounded-xl mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+        <motion.div
+          whileHover={{ scale: 1.15, rotate: 12 }}
+          transition={{ type: 'spring', stiffness: 400 }}
+          className={`inline-flex p-4 bg-gradient-to-br ${color} rounded-xl mb-6 shadow-lg`}
+        >
           <div className="text-white">{icon}</div>
-        </div>
+        </motion.div>
       )}
-      <h3 className="text-xl font-bold mb-3 group-hover:text-orange-600 transition-colors text-gray-800">{title}</h3>
-      <p className="text-gray-600 text-sm leading-relaxed group-hover:text-gray-700 transition-colors">{desc}</p>
-    </div>
+      <motion.h3 
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ delay: delay + 0.2 }}
+        className="text-xl font-bold mb-3 group-hover:text-orange-600 transition-colors text-gray-800"
+      >
+        {title}
+      </motion.h3>
+      <motion.p 
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ delay: delay + 0.3 }}
+        className="text-gray-600 text-sm leading-relaxed group-hover:text-gray-700 transition-colors"
+      >
+        {desc}
+      </motion.p>
+    </motion.div>
   </motion.div>
 );
 
 const TestimonialCard = ({ stars, quote, author, role, delay }) => (
   <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    whileInView={{ opacity: 1, y: 0 }}
+    initial={{ opacity: 0, y: 30, rotateY: -10 }}
+    whileInView={{ opacity: 1, y: 0, rotateY: 0 }}
+    whileHover={{ y: -5, scale: 1.02 }}
     transition={{ duration: 0.5, delay }}
     viewport={{ once: true }}
-    className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-8 space-y-4"
+    className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-8 space-y-4 hover:border-white/40 hover:bg-white/15 transition-all group cursor-pointer"
   >
-    <div className="flex gap-1">
+    <motion.div className="flex gap-1">
       {[...Array(stars)].map((_, i) => (
-        <span key={i} className="text-yellow-400 text-lg">★</span>
+        <motion.span 
+          key={i} 
+          initial={{ opacity: 0, scale: 0 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          transition={{ delay: delay + i * 0.1 }}
+          viewport={{ once: true }}
+          className="text-yellow-400 text-lg"
+        >
+          ★
+        </motion.span>
       ))}
-    </div>
-    <p className="text-gray-700 italic leading-relaxed text-lg font-light">"{quote}"</p>
-    <div className="flex items-center gap-3 pt-4 border-t border-white/10">
-      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-bold">
+    </motion.div>
+    <motion.p 
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      transition={{ delay: delay + 0.2 }}
+      viewport={{ once: true }}
+      className="text-gray-700 italic leading-relaxed text-lg font-light group-hover:text-gray-600 transition-colors"
+    >
+      "{quote}"
+    </motion.p>
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ delay: delay + 0.3 }}
+      viewport={{ once: true }}
+      className="flex items-center gap-3 pt-4 border-t border-white/10 group-hover:border-white/20 transition-colors"
+    >
+      <motion.div 
+        whileHover={{ scale: 1.15 }}
+        className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-bold hover:shadow-lg transition-shadow"
+      >
         {author.split(' ')[0][0]}{author.split(' ')[1][0]}
-      </div>
+      </motion.div>
       <div>
         <p className="font-bold text-gray-900">{author}</p>
         <p className="text-xs text-gray-600">{role}</p>
       </div>
-    </div>
+    </motion.div>
   </motion.div>
 );
 
@@ -78,9 +199,10 @@ const Landing = () => {
           </motion.div>
           
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-gray-700">
+            <a href="#dashboard" className="hover:text-blue-600 transition-colors">Dashboard</a>
             <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
-            <a href="#stats" className="hover:text-blue-600 transition-colors">Impact</a>
-            <a href="#pricing" className="hover:text-blue-600 transition-colors">Pricing</a>
+            <a href="#testimonials" className="hover:text-blue-600 transition-colors">Testimonials</a>
+            <a href="#support" className="hover:text-blue-600 transition-colors">FAQ & Support</a>
           </div>
           
           <motion.div 
@@ -102,34 +224,54 @@ const Landing = () => {
       {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 pt-16 pb-12">
         {/* Hero Section with Dashboard */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-12">
+        <div id="dashboard" className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-12">
           {/* Left side - Text & CTA */}
           <div className="space-y-6">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8 }}
               className="space-y-6"
             >
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-full text-blue-700 text-xs font-bold uppercase tracking-wider"
+                initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 border-2 border-blue-300 rounded-full text-white text-lg font-black uppercase tracking-widest shadow-2xl hover:shadow-3xl hover:from-blue-700 hover:to-blue-700 transition-all relative overflow-hidden mt-6"
               >
-                <Sparkles size={14} className="animate-spin" strokeWidth={3} />
-                Trusted by 50+ Schools Across Uganda
+                <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-20 transition-opacity rounded-full" />
+                <Sparkles size={28} className="animate-spin flex-shrink-0 relative z-10" strokeWidth={3} />
+                <span className="relative z-10">Trusted by 50+ Schools Across Uganda</span>
               </motion.div>
 
               <div className="space-y-2">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05]">
-                  School Finance,
-                  <span className="text-blue-600">
-                    Finally Under Control.
-                  </span>
-                </h1>
-                <p className="text-base md:text-lg text-gray-600 font-light leading-relaxed">
+                <motion.h1 
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05]"
+                >
+                  {['School', 'Finance,'].map((word, idx) => (
+                    <motion.span key={idx} variants={itemVariants} className="inline-block mr-3">
+                      {word}
+                    </motion.span>
+                  ))}
+                  <motion.span variants={itemVariants} className="text-blue-600 inline-block">
+                    Finally
+                  </motion.span>
+                  <br />
+                  <motion.span variants={itemVariants} className="text-blue-600 inline-block">
+                    Under Control.
+                  </motion.span>
+                </motion.h1>
+                <motion.p 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="text-base md:text-lg text-gray-600 font-light leading-relaxed"
+                >
                   Say goodbye to spreadsheets and confusion. Automate fee collection, track payments in real-time, and get instant insights—all in one elegant, powerful platform built for Ugandan schools.
-                </p>
+                </motion.p>
               </div>
             </motion.div>
 
@@ -141,19 +283,32 @@ const Landing = () => {
               className="flex flex-col items-start justify-start gap-3 pt-2"
             >
               <div className="flex flex-col sm:flex-row items-start gap-3 w-full">
-                <Link 
-                  to="/register" 
-                  className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all text-lg flex items-center justify-center gap-3 shadow-2xl hover:shadow-blue-500/50"
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full sm:w-auto"
                 >
-                  Get Started Free
-                  <ArrowRight size={20} strokeWidth={3} />
-                </Link>
-                <a 
+                  <RippleButton
+                    to="/register" 
+                    className="w-full px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all text-lg flex items-center justify-center gap-3 shadow-2xl hover:shadow-blue-500/50"
+                  >
+                    Get Started Free
+                    <motion.div
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    >
+                      <ArrowRight size={20} strokeWidth={3} />
+                    </motion.div>
+                  </RippleButton>
+                </motion.div>
+                <motion.a 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   href="#features"
-                  className="px-10 py-4 backdrop-blur-xl bg-gray-900/10 border border-gray-400/30 rounded-xl font-bold transition-all text-lg text-gray-800 hover:bg-gray-900/20 hover:border-gray-500/50"
+                  className="w-full sm:w-auto px-10 py-4 backdrop-blur-xl bg-gray-900/10 border border-gray-400/30 rounded-xl font-bold transition-all text-lg text-gray-800 hover:bg-gray-900/20 hover:border-gray-500/50"
                 >
                   View Features
-                </a>
+                </motion.a>
               </div>
 
               <motion.div
@@ -163,13 +318,23 @@ const Landing = () => {
                 className="text-left"
               >
                 <p className="text-sm text-gray-400 mb-2">👨‍👩‍👧 Parents: Track your child's balance instantly</p>
-                <Link 
-                  to="/parent-login" 
-                  className="inline-flex px-8 py-3 bg-blue-500/20 border border-blue-400/50 rounded-xl font-bold text-blue-600 hover:bg-blue-500/30 transition-all text-base gap-2 items-center"
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <Key size={18} strokeWidth={2.5} />
-                  Access Parent Portal
-                </Link>
+                  <RippleButton
+                    to="/parent-login" 
+                    className="inline-flex px-8 py-3 bg-blue-500/20 border border-blue-400/50 rounded-xl font-bold text-blue-600 hover:bg-blue-500/30 transition-all text-base gap-2 items-center"
+                  >
+                    <motion.div
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <Key size={18} strokeWidth={2.5} />
+                    </motion.div>
+                    Access Parent Portal
+                  </RippleButton>
+                </motion.div>
               </motion.div>
             </motion.div>
           </div>
@@ -179,6 +344,9 @@ const Landing = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, delay: 0.3 }}
+            variants={floatingVariants}
+            initial="initial"
+            animate="animate"
             className="relative rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-50 via-white to-purple-50 p-2 hidden lg:block"
           >
             <svg viewBox="0 0 900 675" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto">
@@ -233,19 +401,40 @@ const Landing = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="py-8 text-center mb-12 flex flex-col items-center gap-4"
+          className="py-12 text-center mb-16 flex flex-col items-center gap-6"
         >
-          <div className="flex items-center gap-3">
-            <div className="flex -space-x-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm border-2 border-white">G</div>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm border-2 border-white">R</div>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-bold text-sm border-2 border-white">P</div>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center text-gray-900 font-bold text-sm border-2 border-white">J</div>
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            className="backdrop-blur-xl bg-gradient-to-r from-blue-50/80 to-purple-50/80 border border-blue-200/60 rounded-3xl px-8 py-8 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 shadow-lg hover:shadow-2xl transition-all"
+          >
+            <div className="flex -space-x-4">
+              {[ { bg: 'from-blue-500 to-blue-600', letter: 'G' }, { bg: 'from-green-500 to-teal-600', letter: 'R' }, { bg: 'from-orange-500 to-orange-600', letter: 'P' }, { bg: 'from-yellow-400 to-yellow-500', letter: 'J', textColor: 'text-gray-900' } ].map((avatar, i) => (
+                <motion.div 
+                  key={i}
+                  initial={{ opacity: 0, scale: 0 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.3, zIndex: 20 }}
+                  transition={{ delay: i * 0.1 }}
+                  viewport={{ once: true }}
+                  className={`w-16 h-16 rounded-full bg-gradient-to-br ${avatar.bg} flex items-center justify-center ${avatar.textColor || 'text-white'} font-bold text-lg border-4 border-white shadow-lg cursor-pointer`}
+                >
+                  {avatar.letter}
+                </motion.div>
+              ))}
             </div>
-            <p className="text-gray-600 text-sm font-semibold">
-              <span className="text-gray-900 font-black">200+ bursars</span> trust BursarPro across Uganda
-            </p>
-          </div>
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              viewport={{ once: true }}
+              className="text-left md:text-center flex-1"
+            >
+              <p className="text-gray-600 text-base font-medium leading-relaxed">
+                <span className="text-gray-900 font-black text-xl md:text-2xl block mb-1">200+ School Leaders</span>
+                <span className="text-gray-700">trust BursarPro with their finances across Uganda</span>
+              </p>
+            </motion.div>
+          </motion.div>
         </motion.section>
 
         {/* Trusted By Schools */}
@@ -257,8 +446,24 @@ const Landing = () => {
           className="py-10 text-center space-y-8 mb-16"
         >
           <div className="space-y-1">
-            <p className="text-blue-600 font-bold uppercase tracking-widest text-sm">Trusted By Schools Across Uganda</p>
-            <h2 className="text-4xl font-black text-gray-900">Partners Including</h2>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-blue-600 font-bold uppercase tracking-widest text-sm"
+            >
+              Trusted By Schools Across Uganda
+            </motion.p>
+            <motion.h2 
+              initial={{ opacity: 0, y: -10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-4xl font-black text-gray-900"
+            >
+              Partners Including
+            </motion.h2>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center justify-center">
@@ -271,8 +476,12 @@ const Landing = () => {
             ].map((school, i) => (
               <motion.div
                 key={i}
-                whileHover={{ scale: 1.05 }}
-                className="backdrop-blur-xl bg-white/60 border border-blue-200/50 rounded-xl p-4 text-gray-700 font-semibold text-sm hover:border-orange-400/50 transition-all"
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                whileHover={{ scale: 1.08, y: -5 }}
+                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true }}
+                className="backdrop-blur-xl bg-white/60 border border-blue-200/50 rounded-xl p-4 text-gray-700 font-semibold text-sm hover:border-orange-400/50 transition-all cursor-pointer shadow-lg hover:shadow-xl"
               >
                 {school}
               </motion.div>
@@ -282,7 +491,13 @@ const Landing = () => {
 
         {/* Stats Section */}
         <section id="stats" className="py-12 mb-16">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 md:p-10">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 md:p-10"
+          >
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {[
                 { number: '50+', label: 'Schools' },
@@ -292,18 +507,35 @@ const Landing = () => {
               ].map((stat, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                  whileHover={{ scale: 1.1 }}
                   transition={{ duration: 0.5, delay: i * 0.1 }}
                   viewport={{ once: true }}
-                  className="text-center"
+                  className="text-center cursor-pointer"
                 >
-                  <p className="text-4xl md:text-5xl font-black bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent mb-2">{stat.number}</p>
-                  <p className="text-gray-700 font-medium uppercase text-xs tracking-wider">{stat.label}</p>
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    transition={{ delay: 0.3 + i * 0.1 }}
+                    viewport={{ once: true }}
+                    className="text-4xl md:text-5xl font-black bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent mb-2"
+                  >
+                    {stat.number}
+                  </motion.p>
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    transition={{ delay: 0.4 + i * 0.1 }}
+                    viewport={{ once: true }}
+                    className="text-gray-700 font-medium uppercase text-xs tracking-wider"
+                  >
+                    {stat.label}
+                  </motion.p>
                 </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* Features Section */}
@@ -502,10 +734,24 @@ const Landing = () => {
             viewport={{ once: true }}
             className="text-center space-y-2"
           >
-            <p className="text-blue-600 font-bold uppercase tracking-widest text-sm">How It Works</p>
-            <h2 className="text-4xl font-black tracking-tight text-gray-900">
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-blue-600 font-bold uppercase tracking-widest text-sm"
+            >
+              How It Works
+            </motion.p>
+            <motion.h2 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-4xl font-black tracking-tight text-gray-900"
+            >
               Up and Running in Under 24 Hours
-            </h2>
+            </motion.h2>
           </motion.div>
 
           <div className="space-y-4 max-w-2xl mx-auto">
@@ -533,28 +779,39 @@ const Landing = () => {
             ].map((item, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -30 }}
                 whileInView={{ opacity: 1, x: 0 }}
+                whileHover={{ x: 10 }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
                 viewport={{ once: true }}
                 className="flex gap-4 items-start group"
               >
-                <div className="flex-shrink-0">
+                <motion.div 
+                  whileHover={{ scale: 1.15, rotate: 360 }}
+                  transition={{ type: 'spring', stiffness: 400 }}
+                  className="flex-shrink-0"
+                >
                   <div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 text-2xl font-black text-white group-hover:scale-110 transition-transform duration-300 shadow-lg">
                     {item.step}
                   </div>
-                </div>
-                <div className="flex-1 backdrop-blur-xl bg-white/70 border border-blue-200/50 rounded-2xl p-6 hover:border-blue-400/50 transition-all">
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">{item.title}</h3>
-                  <p className="text-gray-700 text-sm leading-relaxed">{item.desc}</p>
-                </div>
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  transition={{ delay: 0.2 + i * 0.1 }}
+                  viewport={{ once: true }}
+                  className="flex-1 backdrop-blur-xl bg-white/70 border border-blue-200/50 rounded-2xl p-6 hover:border-blue-400/50 transition-all group-hover:bg-white/80"
+                >
+                  <h3 className="text-xl font-bold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors">{item.title}</h3>
+                  <p className="text-gray-700 text-sm leading-relaxed group-hover:text-gray-600 transition-colors">{item.desc}</p>
+                </motion.div>
               </motion.div>
             ))}
           </div>
         </section>
 
         {/* Testimonials */}
-        <section className="py-12 space-y-8 mb-12">
+        <section id="testimonials" className="py-12 space-y-8 mb-12">
           <motion.div 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -603,17 +860,34 @@ const Landing = () => {
         </section>
 
         {/* Final CTA */}
-        <section className="py-12 relative mb-16">
-          <div className="backdrop-blur-xl bg-gradient-to-r from-blue-600 to-blue-500 border border-blue-400/30 rounded-3xl p-10 overflow-hidden relative shadow-2xl">
+        <section id="support" className="py-12 relative mb-16">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            whileHover={{ scale: 1.02 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="backdrop-blur-xl bg-gradient-to-r from-blue-600 to-blue-500 border border-blue-400/30 rounded-3xl p-10 overflow-hidden relative shadow-2xl"
+          >
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               className="relative z-10 max-w-2xl mx-auto text-center space-y-6"
             >
-              <h2 className="text-4xl font-black text-white leading-tight">
-                Ready to Transform Your School's Finances?
-              </h2>
+              <motion.h2 
+                variants={containerVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                className="text-4xl font-black text-white leading-tight"
+              >
+                {['Ready to Transform', "Your School's Finances?"].map((word, idx) => (
+                  <motion.span key={idx} variants={itemVariants} className="inline-block mr-2">
+                    {word}
+                  </motion.span>
+                ))}
+              </motion.h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
                 {[
@@ -624,35 +898,52 @@ const Landing = () => {
                 ].map((item, i) => (
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
+                    initial={{ opacity: 0, x: -20 }}
                     whileInView={{ opacity: 1, x: 0 }}
+                    whileHover={{ x: 10 }}
                     transition={{ delay: i * 0.1 }}
                     viewport={{ once: true }}
-                    className="flex items-center gap-3 text-sm text-white"
+                    className="flex items-center gap-3 text-sm text-white group cursor-pointer"
                   >
-                    <span className="text-lg font-bold text-amber-200">{item.split(' ')[0]}</span>
-                    <span className="font-semibold text-sm">{item.substring(2)}</span>
+                    <motion.span 
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                      className="text-lg font-bold text-amber-200"
+                    >
+                      {item.split(' ')[0]}
+                    </motion.span>
+                    <span className="font-semibold text-sm group-hover:translate-x-1 transition-transform">{item.substring(2)}</span>
                   </motion.div>
                 ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Link 
-                  to="/register" 
-                  className="inline-flex px-10 py-4 bg-white text-orange-600 font-black rounded-xl transition-all text-lg shadow-2xl hover:shadow-white/50 hover:scale-105"
+              <motion.div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  Sign Up Now — It's Free
-                </Link>
-                <Link 
-                  to="/parent-login" 
-                  className="inline-flex px-10 py-4 bg-white/20 border-2 border-white text-white font-bold rounded-xl transition-all text-lg hover:bg-white/30 gap-2"
+                  <RippleButton
+                    to="/register" 
+                    className="inline-flex px-10 py-4 bg-white text-orange-600 font-black rounded-xl transition-all text-lg shadow-2xl hover:shadow-white/50"
+                  >
+                    Sign Up Now — It's Free
+                  </RippleButton>
+                </motion.div>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <Key size={20} />
-                  Parent Portal Access
-                </Link>
-              </div>
+                  <RippleButton
+                    to="/parent-login" 
+                    className="inline-flex px-10 py-4 bg-white/20 border-2 border-white text-white font-bold rounded-xl transition-all text-lg hover:bg-white/30 gap-2"
+                  >
+                    <Key size={20} />
+                    Parent Portal Access
+                  </RippleButton>
+                </motion.div>
+              </motion.div>
             </motion.div>
-          </div>
+          </motion.div>
         </section>
       </main>
 

@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { 
   FileText, 
   Download, 
   Calendar,
   Filter,
-  Loader
+  Loader,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDashboard } from '../context/DashboardContext';
@@ -43,7 +47,35 @@ const ReportCard = ({ title, description, icon, onClick, loading }) => (
 
 const Reports = () => {
   const [loading, setLoading] = useState({});
+  const [refundStats, setRefundStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const { terms, selectedTerm, setSelectedTerm } = useDashboard();
+
+  // Fetch refund statistics
+  useEffect(() => {
+    fetchRefundStats();
+  }, []);
+
+  const fetchRefundStats = async () => {
+    setStatsLoading(true);
+    try {
+      const res = await api.get('/refunds/');
+      const refunds = res.data.results || res.data;
+      
+      const stats = {
+        total: refunds.length,
+        pending: refunds.filter(r => r.status === 'PENDING').length,
+        approved: refunds.filter(r => r.status === 'APPROVED').length,
+        totalAmount: refunds.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0),
+        approvalRate: refunds.length > 0 ? Math.round((refunds.filter(r => r.status === 'APPROVED').length / refunds.length) * 100) : 0
+      };
+      setRefundStats(stats);
+    } catch (error) {
+      console.error('Error fetching refund stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const generateReport = async (reportType) => {
     setLoading(prev => ({ ...prev, [reportType]: true }));
@@ -82,6 +114,76 @@ const Reports = () => {
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tight text-gray-800">Reports & Exports</h1>
           <p className="text-gray-600 font-medium">Generate and download comprehensive reports</p>
+        </div>
+
+        {/* Refund Summary Section */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="backdrop-blur-md bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg p-6 rounded-2xl border border-blue-200"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Total Refunds</p>
+                <p className="text-3xl font-black text-gray-800 mt-2">{refundStats?.total || 0}</p>
+              </div>
+              <div className="p-3 bg-blue-200/50 rounded-lg">
+                <TrendingUp size={24} className="text-blue-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="backdrop-blur-md bg-gradient-to-br from-yellow-50 to-yellow-100 shadow-lg p-6 rounded-2xl border border-yellow-200"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Pending</p>
+                <p className="text-3xl font-black text-gray-800 mt-2">{refundStats?.pending || 0}</p>
+              </div>
+              <div className="p-3 bg-yellow-200/50 rounded-lg">
+                <Clock size={24} className="text-yellow-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="backdrop-blur-md bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-lg p-6 rounded-2xl border border-emerald-200"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Approved</p>
+                <p className="text-3xl font-black text-gray-800 mt-2">{refundStats?.approved || 0}</p>
+              </div>
+              <div className="p-3 bg-emerald-200/50 rounded-lg">
+                <CheckCircle size={24} className="text-emerald-600" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="backdrop-blur-md bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg p-6 rounded-2xl border border-purple-200"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-600 uppercase tracking-wider">Approval Rate</p>
+                <p className="text-3xl font-black text-gray-800 mt-2">{refundStats?.approvalRate || 0}%</p>
+              </div>
+              <div className="p-3 bg-purple-200/50 rounded-lg">
+                <AlertCircle size={24} className="text-purple-600" />
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Filters */}

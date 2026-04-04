@@ -10,11 +10,13 @@ import {
   ArrowUpRight,
   BarChart3,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import DashboardCustomizer from '../components/DashboardCustomizer';
 
 const StatCard = ({ title, value, icon, color, subtitle, delay }) => (
   <motion.div 
@@ -102,6 +104,7 @@ const HeadmasterDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTerm, setSelectedTerm] = useState('');
   const [terms, setTerms] = useState([]);
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -301,20 +304,31 @@ const HeadmasterDashboard = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="backdrop-blur-md bg-white/50 rounded-xl p-4 border border-white/30"
+          className="backdrop-blur-md bg-white/50 rounded-xl p-4 border border-white/30 flex items-end gap-4"
         >
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Select Term:
-          </label>
-          <select
-            value={selectedTerm}
-            onChange={handleTermChange}
-            className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-800"
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Select Term:
+            </label>
+            <select
+              value={selectedTerm}
+              onChange={handleTermChange}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-800"
+            >
+              {terms.map(term => (
+                <option key={term.id} value={term.id}>{term.name}</option>
+              ))}
+            </select>
+          </div>
+          <motion.button
+            onClick={() => setIsCustomizerOpen(true)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:shadow-lg transition-all"
           >
-            {terms.map(term => (
-              <option key={term.id} value={term.id}>{term.name}</option>
-            ))}
-          </select>
+            <Settings size={18} />
+            Customize
+          </motion.button>
         </motion.div>
 
         {data && (
@@ -572,6 +586,13 @@ const HeadmasterDashboard = () => {
             )}
           </>
         )}
+
+        {/* Dashboard Customizer Modal */}
+        <DashboardCustomizer 
+          isOpen={isCustomizerOpen} 
+          onClose={() => setIsCustomizerOpen(false)} 
+          role="HEADMASTER"
+        />
       </div>
     </div>
   );

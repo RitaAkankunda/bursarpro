@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Download, AlertCircle, Loader2, TrendingDown, CreditCard, CheckCircle2, ShieldCheck, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { LogOut, Download, AlertCircle, Loader2, TrendingDown, CreditCard, CheckCircle2, ShieldCheck, X, Send, MessageCircle, Bell, Settings, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
@@ -24,6 +24,12 @@ const ParentPortal = () => {
   const [error, setError] = useState('');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview'); // overview, history, messages, preferences
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState({ subject: '', message: '', type: 'GENERAL' });
+  const [showMessageForm, setShowMessageForm] = useState(false);
+  const [notificationPrefs, setNotificationPrefs] = useState(null);
+  const [sendingMessage, setSendingMessage] = useState(false);
   const navigate = useNavigate();
 
   const parentToken = localStorage.getItem('parent_access_token');
@@ -101,6 +107,61 @@ const ParentPortal = () => {
     }
   };
 
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    setSendingMessage(true);
+    try {
+      const parentApi = createParentApi(parentToken);
+      await parentApi.post('/parent-messages/', {
+        student: studentId,
+        sender_role: 'PARENT',
+        message_type: newMessage.type,
+        subject: newMessage.subject,
+        message: newMessage.message
+      });
+      setNewMessage({ subject: '', message: '', type: 'GENERAL' });
+      setShowMessageForm(false);
+      fetchMessages();
+      alert('Message sent successfully!');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const parentApi = createParentApi(parentToken);
+      const res = await parentApi.get(`/parent-messages/?student=${studentId}`);
+      setMessages(res.data.results || res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    }
+  };
+
+  const fetchNotificationPrefs = async () => {
+    try {
+      const parentApi = createParentApi(parentToken);
+      const res = await parentApi.get('/notification-preferences/');
+      setNotificationPrefs(res.data);
+    } catch (err) {
+      console.error('Failed to fetch preferences:', err);
+    }
+  };
+
+  const updateNotificationPrefs = async (field, value) => {
+    try {
+      const parentApi = createParentApi(parentToken);
+      const updated = { ...notificationPrefs, [field]: value };
+      await parentApi.patch(`/notification-preferences/${notificationPrefs.id}/`, { [field]: value });
+      setNotificationPrefs(updated);
+    } catch (err) {
+      console.error('Failed to update preferences:', err);
+    }
+  };
+
   const processOnlinePayment = async (e) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -173,7 +234,7 @@ const ParentPortal = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6 font-outfit pb-20">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
@@ -182,7 +243,7 @@ const ParentPortal = () => {
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Parent Portal</h1>
-            <p className="text-gray-600 text-sm font-medium">Hello, {parentName}!</p>
+            <p className="text-gray-600 text-sm font-medium">Welcome, {parentName}! 👋</p>
           </div>
           <button
             onClick={handleLogout}
@@ -193,115 +254,388 @@ const ParentPortal = () => {
           </button>
         </motion.div>
 
-        {/* Student Info */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="backdrop-blur-md bg-white/60 rounded-xl p-6 space-y-3 border border-white/30 shadow-lg"
-        >
-          <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">Viewing Student</p>
-          <div className="flex items-center justify-between">
+        {/* Student Info & Balance at Top */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Student Info */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="backdrop-blur-md bg-white/60 rounded-xl p-6 space-y-3 border border-white/30 shadow-lg"
+          >
+            <p className="text-xs text-gray-600 font-bold uppercase tracking-widest">Viewing Student</p>
             <div>
               <p className="text-lg font-bold text-gray-800">{balance.student_name}</p>
               <p className="text-sm text-gray-600">Class: {balance.class} | Term: {balance.term}</p>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        {/* Balance Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className={`backdrop-blur-md rounded-2xl p-8 space-y-4 border-2 shadow-lg ${statusColors[balance.payment_status]}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-white/30 rounded-lg">
-              <StatusIcon size={24} />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-widest font-bold opacity-75">Payment Status</p>
-              <p className="text-lg font-bold capitalize">{(balance.payment_status || 'unknown').replace('_', ' ')}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs font-bold opacity-75">Expected Amount</p>
-              <p className="text-2xl font-black">UGX {Number(balance.expected_amount || 0).toLocaleString()}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-bold opacity-75">Amount Paid</p>
-              <p className="text-2xl font-black text-green-700">UGX {Number(balance.amount_paid || 0).toLocaleString()}</p>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-white/20">
-            <p className="text-xs font-bold opacity-75 mb-2">Outstanding Balance</p>
-            <div className="flex items-end justify-between gap-3">
-              <div className="flex items-end gap-3">
-                <p className="text-4xl font-black">UGX {Number(balance.balance_outstanding || 0).toLocaleString()}</p>
-                {(balance.balance_outstanding || 0) > 0 && (
-                  <p className="text-sm font-bold opacity-75 mb-1">to be paid</p>
-                )}
+          {/* Balance Card - Large */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className={`backdrop-blur-md lg:col-span-2 rounded-2xl p-8 space-y-4 border-2 shadow-lg ${statusColors[balance.payment_status]}`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/30 rounded-lg">
+                  <StatusIcon size={24} />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-widest font-bold opacity-75">Payment Status</p>
+                  <p className="text-lg font-bold capitalize">{(balance.payment_status || 'unknown').replace('_', ' ')}</p>
+                </div>
               </div>
               {(balance.balance_outstanding || 0) > 0 && (
                 <button
                   onClick={() => setIsCheckoutOpen(true)}
-                  className="px-6 py-3 bg-white text-blue-900 rounded-xl font-black shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+                  className="px-6 py-3 bg-white text-blue-900 rounded-xl font-black shadow-lg hover:scale-105 transition-transform flex items-center gap-2 whitespace-nowrap"
                 >
                   <CreditCard size={20} /> Pay Now
                 </button>
               )}
             </div>
-          </div>
-        </motion.div>
 
-        {/* Payment History */}
+            <div className="pt-4 border-t border-white/20">
+              <p className="text-xs font-bold opacity-75 mb-2">Outstanding Balance</p>
+              <p className="text-4xl font-black">UGX {Number(balance.balance_outstanding || 0).toLocaleString()}</p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Tab Navigation */}
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="backdrop-blur-md bg-white/60 rounded-xl p-6 space-y-4 border border-white/30 shadow-lg"
+          className="flex gap-2 bg-white/60 backdrop-blur-md rounded-2xl p-2 border border-white/30 shadow-lg"
         >
-          <h2 className="text-lg font-bold text-gray-800">Payment History</h2>
-          
-          {payments.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-gray-600 font-medium">No payments recorded yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {payments.map((payment, idx) => (
-                <motion.div
-                  key={payment.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + idx * 0.05 }}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-800">Receipt {payment.receipt_number}</p>
-                    <p className="text-xs text-gray-600">{payment.term} • {payment.payment_date}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="font-bold text-green-600 text-lg">UGX {Number(payment.amount).toLocaleString()}</p>
-                    <button
-                      onClick={() => handleDownloadReceipt(payment.id, payment.receipt_number)}
-                      className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors border border-blue-300"
-                      title="Download receipt"
-                    >
-                      <Download size={16} className="text-blue-600" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          )}
+          {[
+            { id: 'overview', label: 'Overview', icon: '📊' },
+            { id: 'history', label: 'Payment History', icon: '📜' },
+            { id: 'messages', label: 'Messages', icon: '💬', count: messages.length },
+            { id: 'preferences', label: 'Preferences', icon: '⚙️' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (tab.id === 'messages') fetchMessages();
+                if (tab.id === 'preferences') fetchNotificationPrefs();
+              }}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                activeTab === tab.id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-gray-800 hover:bg-white/40'
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
+              {tab.count && <span className="bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">{tab.count}</span>}
+            </button>
+          ))}
         </motion.div>
 
-        {/* Footer Info */}
+        {/* Overview Tab */}
+        <AnimatePresence>
+          {activeTab === 'overview' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="space-y-6"
+            >
+              {/* Quick Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg hover:shadow-xl transition-all"
+                >
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">Expected Amount</p>
+                  <p className="text-2xl font-black text-gray-800 mt-2">UGX {Number(balance.expected_amount).toLocaleString()}</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg hover:shadow-xl transition-all"
+                >
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">Amount Paid</p>
+                  <p className="text-2xl font-black text-green-600 mt-2">UGX {Number(balance.amount_paid).toLocaleString()}</p>
+                </motion.div>
+
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg hover:shadow-xl transition-all"
+                >
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">Collection Progress</p>
+                  <div className="mt-2 space-y-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all" 
+                        style={{ width: `${(balance.amount_paid / balance.expected_amount * 100) || 0}%` }}
+                      />
+                    </div>
+                    <p className="text-sm font-bold text-gray-700">{Math.round((balance.amount_paid / balance.expected_amount * 100) || 0)}%</p>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Alert Banner if Outstanding */}
+              {(balance.balance_outstanding || 0) > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="backdrop-blur-md bg-orange-100/60 border-l-4 border-orange-600 rounded-xl p-6 border border-orange-200 shadow-lg"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1">
+                      <AlertTriangle className="text-orange-600" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-orange-900 mb-1">Outstanding Balance Alert</h3>
+                      <p className="text-sm text-orange-800">Your student has an outstanding balance of <span className="font-black">UGX {Number(balance.balance_outstanding).toLocaleString()}</span>. Please make payment to avoid any inconvenience.</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Payment History Tab */}
+          {activeTab === 'history' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="backdrop-blur-md bg-white/60 rounded-xl p-6 space-y-4 border border-white/30 shadow-lg"
+            >
+              <h2 className="text-lg font-bold text-gray-800">Payment Timeline</h2>
+              
+              {payments.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Clock size={40} className="text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 font-medium">No payments recorded yet</p>
+                </div>
+              ) : (
+                <div className="space-y-0">
+                  {payments.map((payment, idx) => (
+                    <motion.div
+                      key={payment.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                          <CheckCircle2 className="text-green-600" size={24} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-800">Receipt {payment.receipt_number}</p>
+                          <p className="text-xs text-gray-500 flex items-center gap-2">
+                            <Calendar size={14} />
+                            {new Date(payment.payment_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-black text-green-600">UGX {Number(payment.amount).toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">{payment.term}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDownloadReceipt(payment.id, payment.receipt_number)}
+                          className="p-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors border border-blue-300"
+                          title="Download receipt"
+                        >
+                          <Download size={16} className="text-blue-600" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Messages Tab */}
+          {activeTab === 'messages' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-bold text-gray-800">School Communications</h2>
+                <button
+                  onClick={() => setShowMessageForm(!showMessageForm)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all"
+                >
+                  <Send size={16} />
+                  Send Message
+                </button>
+              </div>
+
+              {/* Message Form */}
+              {showMessageForm && (
+                <motion.form
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onSubmit={handleSendMessage}
+                  className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg space-y-4"
+                >
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 block mb-2">Message Type</label>
+                    <select 
+                      value={newMessage.type} 
+                      onChange={(e) => setNewMessage({...newMessage, type: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="GENERAL">General Inquiry</option>
+                      <option value="FEES">Fees Related</option>
+                      <option value="PAYMENT">Payment Issue</option>
+                      <option value="STUDENT">Student Related</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 block mb-2">Subject</label>
+                    <input 
+                      type="text"
+                      value={newMessage.subject}
+                      onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
+                      placeholder="Brief subject"
+                      required
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-bold text-gray-700 block mb-2">Message</label>
+                    <textarea 
+                      value={newMessage.message}
+                      onChange={(e) => setNewMessage({...newMessage, message: e.target.value})}
+                      placeholder="Your message here..."
+                      required
+                      rows="4"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowMessageForm(false)}
+                      className="flex-1 py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={sendingMessage}
+                      className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {sendingMessage ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
+                      {sendingMessage ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                </motion.form>
+              )}
+
+              {/* Messages List */}
+              <div className="space-y-3">
+                {messages.length === 0 ? (
+                  <div className="backdrop-blur-md bg-white/60 rounded-xl p-12 border border-white/30 shadow-lg text-center">
+                    <MessageCircle size={40} className="text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-600 font-medium">No messages yet</p>
+                  </div>
+                ) : (
+                  messages.map((msg, idx) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className={`backdrop-blur-md rounded-xl p-4 border border-white/30 shadow-lg transition-all ${
+                        msg.sender_role === 'PARENT' ? 'bg-blue-50/60 border-blue-200' : 'bg-green-50/60 border-green-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-bold text-gray-800">{msg.subject}</p>
+                          <p className="text-xs text-gray-500">{msg.sender_role === 'PARENT' ? 'You' : 'School'} • {new Date(msg.created_at).toLocaleDateString()}</p>
+                        </div>
+                        {msg.status !== 'READ' && msg.sender_role !== 'PARENT' && (
+                          <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">New</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700 mt-2">{msg.message}</p>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Preferences Tab */}
+          {activeTab === 'preferences' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="backdrop-blur-md bg-white/60 rounded-xl p-6 border border-white/30 shadow-lg space-y-6"
+            >
+              <div>
+                <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                  <Bell size={20} />
+                  Notification Preferences
+                </h2>
+
+                <div className="space-y-4">
+                  {notificationPrefs && [
+                    { key: 'payment_sms', label: 'Payment Confirmation via SMS', icon: '💬' },
+                    { key: 'payment_email', label: 'Payment Confirmation via Email', icon: '📧' },
+                    { key: 'outstanding_fees_email', label: 'Outstanding Fees Alerts', icon: '⚠️' },
+                    { key: 'weekly_summary_email', label: 'Weekly Summary Report', icon: '📊' },
+                    { key: 'report_email', label: 'General Reports', icon: '📄' },
+                  ].map(pref => (
+                    <motion.div
+                      key={pref.key}
+                      whileHover={{ scale: 1.02 }}
+                      className="flex items-center justify-between p-4 bg-white/40 rounded-lg border border-white/50 hover:border-blue-300 transition-all"
+                    >
+                      <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                        <span className="text-2xl">{pref.icon}</span>
+                        <span className="font-bold text-gray-800">{pref.label}</span>
+                      </label>
+                      <input
+                        type="checkbox"
+                        checked={notificationPrefs[pref.key] || false}
+                        onChange={(e) => updateNotificationPrefs(pref.key, e.target.checked)}
+                        className="w-6 h-6 cursor-pointer"
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-white/30">
+                <h3 className="font-bold text-gray-800 mb-4">School Contact Information</h3>
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700"><strong>Bursar's Office:</strong> +256 700 123 456</p>
+                  <p className="text-sm text-gray-700"><strong>Email:</strong> bursar@school.ug</p>
+                  <p className="text-sm text-gray-700"><strong>Website:</strong> www.school.ug</p>
+                  <p className="text-sm text-gray-700"><strong>Office Hours:</strong> Monday - Friday, 8AM - 4PM</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Footer */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

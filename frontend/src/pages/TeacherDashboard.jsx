@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, BookOpen, Users, Loader2, AlertCircle } from 'lucide-react';
+import { LogOut, BookOpen, Users, Loader2, AlertCircle, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import api from '../services/api';
+import DashboardCustomizer from '../components/DashboardCustomizer';
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function TeacherDashboard() {
   const [error, setError] = useState('');
   const [selectedTerm, setSelectedTerm] = useState('');
   const [expandedClass, setExpandedClass] = useState(null);
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
   const userRole = localStorage.getItem('userRole');
 
@@ -117,13 +119,24 @@ export default function TeacherDashboard() {
             </h1>
             <p className="text-gray-600 text-sm font-medium">{dashboard.school}</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-3 bg-white hover:bg-gray-100 rounded-lg transition border border-gray-200"
-            title="Logout"
-          >
-            <LogOut size={20} className="text-gray-700" />
-          </button>
+          <div className="flex items-center gap-3">
+            <motion.button
+              onClick={() => setIsCustomizerOpen(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold rounded-lg hover:shadow-lg transition-all"
+            >
+              <Settings size={18} />
+              Customize
+            </motion.button>
+            <button
+              onClick={handleLogout}
+              className="p-3 bg-white hover:bg-gray-100 rounded-lg transition border border-gray-200"
+              title="Logout"
+            >
+              <LogOut size={20} className="text-gray-700" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Term Selector */}
@@ -273,6 +286,13 @@ export default function TeacherDashboard() {
             </div>
           )}
         </motion.div>
+
+        {/* Dashboard Customizer Modal */}
+        <DashboardCustomizer 
+          isOpen={isCustomizerOpen} 
+          onClose={() => setIsCustomizerOpen(false)} 
+          role="TEACHER"
+        />
       </div>
     </div>
   );

@@ -1,21 +1,33 @@
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Sum, Count, Q
-from .models import School, ClassLevel, Term, FeeStructure, Student, Payment, UserRole, Notification, NotificationPreference
+from django.contrib.auth.models import User
+from datetime import datetime
+import json
+from .models import School, ClassLevel, Term, FeeStructure, Student, Payment, UserRole, Notification, NotificationPreference, DashboardWidget, DashboardPreference, DashboardAlert
+from .refund_models import AuditLog
 from .serializers import (
     SchoolSerializer, ClassLevelSerializer, TermSerializer,
     FeeStructureSerializer, StudentSerializer, PaymentSerializer,
     UserRegistrationSerializer, UserRoleSerializer, ParentPINSerializer,
-    NotificationSerializer, NotificationPreferenceSerializer
+    NotificationSerializer, NotificationPreferenceSerializer,
+    BankStatementSerializer, PaymentReconciliationSerializer, ReconciliationDiscrepancySerializer,
+    SMSReminderConfigurationSerializer, SMSReminderSerializer, SMSReminderHistorySerializer, SMSReminderTemplateSerializer,
+    DashboardWidgetSerializer, DashboardPreferenceSerializer, DashboardAlertSerializer,
+    AuditLogSerializer
 )
 from .permissions import IsBursar, BursarOrReadOnly
 from .utils import send_payment_sms, render_to_pdf
 from .notification_service import SMSService, EmailService
 from .reports import ReportGenerator
 from .bulk_payment_service import BulkPaymentProcessor, BulkPaymentError
+from .sms_reminder_service import SMSReminderService
+from .dashboard_service import BursarDashboardService, HeadmasterDashboardService, TeacherDashboardService, ParentDashboardService
+from .search_service import StudentSearchService, PaymentSearchService, FeeStructureSearchService, GlobalSearchService
+from .widget_customization_service import WidgetCustomizationService, WidgetLayoutService
 from django.http import HttpResponse
 from io import BytesIO
 from reportlab.lib.pagesizes import letter, A4
@@ -213,11 +225,42 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         
         term_id = self.request.query_params.get('term_id')
         class_level_id = self.request.query_params.get('class_level_id')
+        search = self.request.query_params.get('search')
+        min_amount = self.request.query_params.get('min_amount')
+        max_amount = self.request.query_params.get('max_amount')
+        sort_by = self.request.query_params.get('sort_by', 'date')
+        
         if term_id:
             qs = qs.filter(term_id=term_id)
         if class_level_id:
-            qs = qs.filter(class_level_id=class_level_id)
+            qs = qs.filter(student__class_level_id=class_level_id)
+        
+        # Use search service for advanced filtering
+        if user_role and user_role.school:
+            search_service = FeeStructureSearchService(user_role.school, qs)
+        else:
+            search_service = FeeStructureSearchService(None, qs)
+        
+        if search:
+            qs = search_service.search(search)
+        if min_amount or max_amount:
+            qs = search_service.filter_by_amount_range(min_amount, max_amount)
+        
+        qs = search_service.sort(sort_by)
         return qs
+    
+    @action(detail=False, methods=['get'])
+    def search_stats(self, request):
+        """Get aggregated statistics for current search/filter results"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        qs = self.get_queryset()
+        search_service = FeeStructureSearchService(user_role.school, qs)
+        stats = search_service.get_summary_stats(qs)
+        
+        return Response(stats)
 
     def perform_create(self, serializer):
         # Verify term belongs to user's school
@@ -250,17 +293,29 @@ class StudentViewSet(viewsets.ModelViewSet):
         school_id = self.request.query_params.get('school_id')
         class_level_id = self.request.query_params.get('class_level_id')
         search = self.request.query_params.get('search')
+        status_filter = self.request.query_params.get('status')
+        gender = self.request.query_params.get('gender')
+        sort_by = self.request.query_params.get('sort_by', 'date_joined')
 
         if school_id:
             qs = qs.filter(school_id=school_id)
         if class_level_id:
             qs = qs.filter(class_level_id=class_level_id)
+        
+        # Use search service for advanced filtering
+        if user_role and user_role.school:
+            search_service = StudentSearchService(user_role.school, qs)
+        else:
+            search_service = StudentSearchService(qs.first().school if qs.exists() else None, qs)
+        
         if search:
-            qs = qs.filter(
-                Q(first_name__icontains=search) |
-                Q(last_name__icontains=search) |
-                Q(student_id__icontains=search)
-            )
+            qs = search_service.search(search)
+        if status_filter:
+            qs = search_service.filter_by_status(status_filter)
+        if gender:
+            qs = search_service.filter_by_gender(gender)
+        
+        qs = search_service.sort(sort_by)
         return qs
 
     def perform_create(self, serializer):
@@ -288,8 +343,21 @@ class StudentViewSet(viewsets.ModelViewSet):
         if self.request.query_params.get('no_paginate') == 'true':
             return None
         return super().paginate_queryset(queryset)
+    
+    @action(detail=False, methods=['get'])
+    def search_stats(self, request):
+        """Get aggregated statistics for current search/filter results"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
         
-    @action(detail=False, methods=['post'])
+        qs = self.get_queryset()
+        search_service = StudentSearchService(user_role.school, qs)
+        stats = search_service.get_summary_stats()
+        
+        return Response(stats)
+        
+    @action(detail=False, methods=['get'])
     def send_reminders(self, request):
         term_id = request.data.get('term_id')
         if not term_id:
@@ -337,17 +405,60 @@ class PaymentViewSet(viewsets.ModelViewSet):
         
         student_id = self.request.query_params.get('student_id')
         term_id = self.request.query_params.get('term_id')
+        search = self.request.query_params.get('search')
+        status_filter = self.request.query_params.get('status')
+        method_filter = self.request.query_params.get('method')
+        class_level_id = self.request.query_params.get('class_level_id')
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        min_amount = self.request.query_params.get('min_amount')
+        max_amount = self.request.query_params.get('max_amount')
+        sort_by = self.request.query_params.get('sort_by', 'date')
 
         if student_id:
             qs = qs.filter(student_id=student_id)
         if term_id:
             qs = qs.filter(term_id=term_id)
-        return qs.order_by('-payment_date')
+        
+        # Use search service for advanced filtering
+        if user_role and user_role.school:
+            search_service = PaymentSearchService(user_role.school, qs)
+        else:
+            search_service = PaymentSearchService(None, qs)
+        
+        if search:
+            qs = search_service.search(search)
+        if status_filter:
+            qs = search_service.filter_by_status(status_filter)
+        if method_filter:
+            qs = search_service.filter_by_method(method_filter)
+        if class_level_id:
+            qs = search_service.filter_by_class(class_level_id)
+        if start_date or end_date:
+            qs = search_service.filter_by_date_range(start_date, end_date)
+        if min_amount or max_amount:
+            qs = search_service.filter_by_amount_range(min_amount, max_amount)
+        
+        qs = search_service.sort(sort_by)
+        return qs
 
     def paginate_queryset(self, queryset):
         if self.request.query_params.get('no_paginate') == 'true':
             return None
         return super().paginate_queryset(queryset)
+    
+    @action(detail=False, methods=['get'])
+    def search_stats(self, request):
+        """Get aggregated statistics for current search/filter results"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        qs = self.get_queryset()
+        search_service = PaymentSearchService(user_role.school, qs)
+        stats = search_service.get_summary_stats(qs)
+        
+        return Response(stats)
 
     def perform_create(self, serializer):
         payment = serializer.save(recorded_by=self.request.user)
@@ -1427,3 +1538,1199 @@ class BulkPaymentViewSet(viewsets.ViewSet):
             'required_columns': ['Student ID', 'Amount', 'Receipt Number', 'Payment Method'],
             'valid_payment_methods': ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_MONEY']
         })
+
+
+# Payment Reconciliation ViewSets
+class BankStatementViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bank statement uploads and processing.
+    """
+    serializer_class = None  # Will be set based on action
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter statements by user's school"""
+        from .models import BankStatement
+        user_school = UserRole.objects.filter(user=self.request.user).first()
+        if user_school:
+            return BankStatement.objects.filter(school=user_school.school).order_by('-statement_date')
+        return BankStatement.objects.none()
+    
+    def get_serializer_class(self):
+        from .serializers import BankStatementSerializer
+        return BankStatementSerializer
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
+    def process(self, request, pk=None):
+        """
+        Process an uploaded bank statement for reconciliation.
+        """
+        from .models import BankStatement
+        statement = self.get_object()
+        
+        if statement.status != 'PENDING':
+            return Response(
+                {'error': f'Statement already in {statement.get_status_display()} status'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Update status to processing
+            statement.status = 'PROCESSING'
+            statement.save()
+            
+            # TODO: Parse bank statement file and create reconciliation records
+            # This would typically involve:
+            # 1. Reading the bank statement file (CSV, Excel, etc.)
+            # 2. Extracting transaction data
+            # 3. Creating PaymentReconciliation records for each transaction
+            # 4. Running matching algorithm
+            
+            statement.status = 'PARTIAL'
+            statement.save()
+            
+            serializer = self.get_serializer(statement)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            statement.status = 'FAILED'
+            statement.save()
+            return Response(
+                {'error': f'Error processing statement: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PaymentReconciliationViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing payment reconciliations and matching.
+    """
+    serializer_class = None  # Will be set based on action
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter reconciliations by user's school (through bank statement)"""
+        from .models import PaymentReconciliation
+        user_school = UserRole.objects.filter(user=self.request.user).first()
+        if user_school:
+            return PaymentReconciliation.objects.filter(
+                bank_statement__school=user_school.school
+            ).order_by('-bank_date')
+        return PaymentReconciliation.objects.none()
+    
+    def get_serializer_class(self):
+        from .serializers import PaymentReconciliationSerializer
+        return PaymentReconciliationSerializer
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
+    def match_payment(self, request, pk=None):
+        """
+        Manually match a bank transaction to a payment.
+        """
+        from .models import PaymentReconciliation
+        reconciliation = self.get_object()
+        payment_id = request.data.get('payment_id')
+        confidence = request.data.get('confidence_score', 100)
+        notes = request.data.get('notes', '')
+        
+        if not payment_id:
+            return Response(
+                {'error': 'payment_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            payment = Payment.objects.get(id=payment_id)
+            
+            # Update reconciliation
+            reconciliation.payment = payment
+            reconciliation.matched_amount = payment.amount_paid
+            reconciliation.amount_difference = abs(reconciliation.bank_amount - payment.amount_paid)
+            reconciliation.status = 'MANUAL_MATCHED'
+            reconciliation.confidence_score = confidence
+            reconciliation.notes = notes
+            reconciliation.matched_by = request.user
+            reconciliation.matched_at = datetime.now()
+            reconciliation.save()
+            
+            serializer = self.get_serializer(reconciliation)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Payment.DoesNotExist:
+            return Response(
+                {'error': 'Payment not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
+    def unmatched(self, request):
+        """Get all unmatched reconciliation records"""
+        from .models import PaymentReconciliation
+        queryset = self.get_queryset().filter(status='UNMATCHED')
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
+    def disputed(self, request):
+        """Get all disputed reconciliation records"""
+        from .models import PaymentReconciliation
+        queryset = self.get_queryset().filter(status='DISPUTED')
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class ReconciliationDiscrepancyViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing reconciliation discrepancies.
+    """
+    serializer_class = None  # Will be set based on action
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter discrepancies by user's school (through reconciliation -> bank statement)"""
+        from .models import ReconciliationDiscrepancy
+        user_school = UserRole.objects.filter(user=self.request.user).first()
+        if user_school:
+            return ReconciliationDiscrepancy.objects.filter(
+                reconciliation__bank_statement__school=user_school.school
+            ).order_by('-severity', '-created_at')
+        return ReconciliationDiscrepancy.objects.none()
+    
+    def get_serializer_class(self):
+        from .serializers import ReconciliationDiscrepancySerializer
+        return ReconciliationDiscrepancySerializer
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
+    def resolve(self, request, pk=None):
+        """
+        Mark a discrepancy as resolved.
+        """
+        from .models import ReconciliationDiscrepancy
+        discrepancy = self.get_object()
+        resolution_notes = request.data.get('resolution_notes', '')
+        
+        discrepancy.is_resolved = True
+        discrepancy.resolution_notes = resolution_notes
+        discrepancy.resolved_at = datetime.now()
+        discrepancy.save()
+        
+        serializer = self.get_serializer(discrepancy)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
+    def unresolved(self, request):
+        """Get all unresolved discrepancies"""
+        from .models import ReconciliationDiscrepancy
+        queryset = self.get_queryset().filter(is_resolved=False)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
+    def by_severity(self, request):
+        """Get discrepancies filtered by severity"""
+        from .models import ReconciliationDiscrepancy
+        severity = request.query_params.get('severity')
+        
+        if not severity:
+            return Response(
+                {'error': 'severity query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        queryset = self.get_queryset().filter(severity=severity)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+# SMS Reminder ViewSets
+class SMSReminderConfigurationViewSet(viewsets.ViewSet):
+    """
+    ViewSet for managing SMS reminder configuration.
+    Only one config per school.
+    """
+    permission_classes = [IsAuthenticated, IsBursar]
+    
+    def get_school(self):
+        """Get user's school"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        return user_role.school if user_role else None
+    
+    def list(self, request):
+        """Get SMS reminder configuration for school"""
+        from .models import SMSReminderConfiguration
+        school = self.get_school()
+        if not school:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        config, created = SMSReminderConfiguration.objects.get_or_create(school=school)
+        serializer = SMSReminderConfigurationSerializer(config)
+        return Response(serializer.data)
+    
+    def update(self, request, pk=None):
+        """Update SMS reminder configuration"""
+        from .models import SMSReminderConfiguration
+        school = self.get_school()
+        if not school:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        config, created = SMSReminderConfiguration.objects.get_or_create(school=school)
+        serializer = SMSReminderConfigurationSerializer(config, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get SMS reminder statistics"""
+        school = self.get_school()
+        if not school:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = SMSReminderService(school)
+        stats = service.get_stats()
+        return Response(stats)
+
+
+class SMSReminderViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing scheduled SMS reminders.
+    """
+    serializer_class = None
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter reminders by user's school"""
+        from .models import SMSReminder
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role:
+            return SMSReminder.objects.filter(school=user_role.school).order_by('-scheduled_send_time')
+        return SMSReminder.objects.none()
+    
+    def get_serializer_class(self):
+        return SMSReminderSerializer
+    
+    @action(detail=False, methods=['post'])
+    def schedule_batch(self, request):
+        """Schedule reminders for upcoming payment deadlines"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if not user_role:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = SMSReminderService(user_role.school)
+        scheduled_count = service.schedule_reminders()
+        
+        return Response({
+            'message': f'Scheduled {scheduled_count} SMS reminders',
+            'count': scheduled_count
+        })
+    
+    @action(detail=False, methods=['post'])
+    def send_scheduled(self, request):
+        """Send all scheduled reminders that are due"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if not user_role:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = SMSReminderService(user_role.school)
+        sent_count = service.send_scheduled_reminders()
+        
+        return Response({
+            'message': f'Sent {sent_count} SMS reminders',
+            'count': sent_count
+        })
+    
+    @action(detail=True, methods=['post'])
+    def resend(self, request, pk=None):
+        """Resend a failed SMS reminder"""
+        from .models import SMSReminder
+        reminder = self.get_object()
+        
+        if reminder.status == 'FAILED':
+            service = SMSReminderService(reminder.school)
+            success = service.send_sms(reminder)
+            
+            if success:
+                reminder.status = 'SENT'
+                reminder.sent_at = datetime.now()
+                reminder.retry_count += 1
+                reminder.save()
+                
+                serializer = self.get_serializer(reminder)
+                return Response(serializer.data)
+            else:
+                return Response(
+                    {'error': 'Failed to send reminder'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            return Response(
+                {'error': f'Cannot resend reminder with status {reminder.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get all pending reminders"""
+        queryset = self.get_queryset().filter(status='PENDING')
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class SMSReminderHistoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for viewing SMS reminder history (read-only).
+    """
+    serializer_class = SMSReminderHistorySerializer
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter history by user's school"""
+        from .models import SMSReminderHistory
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role:
+            return SMSReminderHistory.objects.filter(school=user_role.school).order_by('-sent_at')
+        return SMSReminderHistory.objects.none()
+    
+    @action(detail=False, methods=['get'])
+    def by_student(self, request):
+        """Get SMS history for a specific student"""
+        from .models import SMSReminderHistory
+        student_id = request.query_params.get('student_id')
+        
+        if not student_id:
+            return Response(
+                {'error': 'student_id query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        queryset = self.get_queryset().filter(student_id=student_id)
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def monthly_cost(self, request):
+        """Get monthly SMS cost"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if not user_role:
+            return Response({'error': 'School not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = SMSReminderService(user_role.school)
+        cost = service.get_monthly_cost()
+        
+        return Response({
+            'monthly_cost': float(cost),
+            'budget_exceeded': service.is_budget_exceeded()
+        })
+
+
+class SMSReminderTemplateViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing SMS reminder message templates.
+    """
+    serializer_class = SMSReminderTemplateSerializer
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter templates by user's school"""
+        from .models import SMSReminderTemplate
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role:
+            return SMSReminderTemplate.objects.filter(school=user_role.school).order_by('-created_at')
+        return SMSReminderTemplate.objects.none()
+
+
+class DashboardWidgetViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing dashboard widget configurations by role.
+    Allows Bursars to configure which widgets appear for each role.
+    """
+    serializer_class = DashboardWidgetSerializer
+    permission_classes = [IsAuthenticated, IsBursar]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter widgets by user's school"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role:
+            return DashboardWidget.objects.filter(school=user_role.school).order_by('role', 'order')
+        return DashboardWidget.objects.none()
+    
+    def perform_create(self, serializer):
+        """Attach school automatically from user's role"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if user_role:
+            serializer.save(school=user_role.school)
+    
+    @action(detail=False, methods=['get'])
+    def by_role(self, request):
+        """Get all widgets configured for a specific role"""
+        role = request.query_params.get('role')
+        if not role:
+            return Response({'error': 'role parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        widgets = DashboardWidget.objects.filter(
+            school=user_role.school,
+            role=role,
+            is_enabled=True
+        ).order_by('order')
+        
+        serializer = self.get_serializer(widgets, many=True)
+        return Response(serializer.data)
+
+
+class DashboardPreferenceViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing user-specific dashboard preferences.
+    Each user has one DashboardPreference record.
+    """
+    serializer_class = DashboardPreferenceSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Filter preferences - users can only see their own"""
+        return DashboardPreference.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        """Create preference for current user"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        serializer.save(user=self.request.user, school=user_role.school if user_role else None)
+    
+    @action(detail=False, methods=['get'])
+    def my_preference(self, request):
+        """Get current user's dashboard preference"""
+        try:
+            preference = DashboardPreference.objects.get(user=request.user)
+            serializer = self.get_serializer(preference)
+            return Response(serializer.data)
+        except DashboardPreference.DoesNotExist:
+            return Response({'error': 'No preference found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'])
+    def update_theme(self, request):
+        """Quick update to theme setting"""
+        theme = request.data.get('theme')
+        if theme not in ['light', 'dark']:
+            return Response({'error': 'Invalid theme'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            preference = DashboardPreference.objects.get(user=request.user)
+            preference.theme = theme
+            preference.save()
+            return Response({'success': True, 'theme': theme})
+        except DashboardPreference.DoesNotExist:
+            return Response({'error': 'No preference found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['post'])
+    def toggle_widget_visibility(self, request):
+        """Toggle visibility of a specific widget"""
+        widget_type = request.data.get('widget_type')
+        if not widget_type:
+            return Response({'error': 'widget_type required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            preference = DashboardPreference.objects.get(user=request.user)
+            hidden = preference.hidden_widgets or []
+            
+            if widget_type in hidden:
+                hidden.remove(widget_type)
+            else:
+                hidden.append(widget_type)
+            
+            preference.hidden_widgets = hidden
+            preference.save()
+            
+            return Response({'hidden_widgets': hidden})
+        except DashboardPreference.DoesNotExist:
+            return Response({'error': 'No preference found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class DashboardAlertViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing dashboard alerts.
+    Alerts can target specific roles or individual users.
+    """
+    serializer_class = DashboardAlertSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+    
+    def get_queryset(self):
+        """Get alerts relevant to the current user"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        
+        # Get alerts for user's role or specific to user
+        alerts = DashboardAlert.objects.filter(
+            school=user_role.school if user_role else None
+        ).filter(
+            Q(target_role=user_role.role if user_role else None) | Q(target_user=self.request.user)
+        ).order_by('-severity', '-created_at')
+        
+        return alerts
+    
+    def perform_create(self, serializer):
+        """Create alert - only Bursars can do this"""
+        user_role = UserRole.objects.filter(user=self.request.user).first()
+        if not user_role or user_role.role != 'BURSAR':
+            raise PermissionError('Only Bursars can create alerts')
+        serializer.save(school=user_role.school)
+    
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        """Mark an alert as read"""
+        alert = self.get_object()
+        alert.is_read = True
+        alert.read_at = timezone.now()
+        alert.save()
+        return Response({'success': True})
+    
+    @action(detail=True, methods=['post'])
+    def dismiss(self, request, pk=None):
+        """Dismiss (hide) an alert"""
+        alert = self.get_object()
+        alert.is_dismissed = True
+        alert.dismissed_at = timezone.now()
+        alert.save()
+        return Response({'success': True})
+    
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        """Get count of unread alerts for current user"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        
+        count = DashboardAlert.objects.filter(
+            school=user_role.school if user_role else None,
+            is_read=False,
+            is_dismissed=False
+        ).filter(
+            Q(target_role=user_role.role if user_role else None) | Q(target_user=request.user)
+        ).count()
+        
+        return Response({'unread_count': count})
+    
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """Get only active (not dismissed) alerts"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        
+        alerts = self.get_queryset().filter(is_dismissed=False)
+        serializer = self.get_serializer(alerts, many=True)
+        return Response(serializer.data)
+
+
+class RoleDashboardViewSet(viewsets.ViewSet):
+    """
+    ViewSet for retrieving role-specific dashboard data.
+    Aggregates statistics based on user's role.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def bursar_dashboard(self, request):
+        """Get Bursar dashboard data with payment statistics"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role or user_role.role != 'BURSAR':
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        from django.utils import timezone
+        service = BursarDashboardService(user_role.school)
+        
+        return Response({
+            'payment_summary': service.get_payment_summary(),
+            'top_outstanding_students': service.get_top_outstanding_students(limit=5),
+            'recent_payments': service.get_recent_payments(limit=10),
+            'sms_stats': service.get_sms_stats(),
+            'reconciliation_stats': service.get_reconciliation_stats(),
+            'payment_methods_breakdown': service.get_payment_methods_breakdown(),
+        })
+    
+    @action(detail=False, methods=['get'])
+    def headmaster_dashboard(self, request):
+        """Get Headmaster dashboard data with school overview"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role or user_role.role != 'HEADMASTER':
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        service = HeadmasterDashboardService(user_role.school)
+        
+        return Response({
+            'school_overview': service.get_school_overview(),
+            'class_performance': service.get_class_performance(),
+            'payment_trends': service.get_payment_trends(),
+            'teacher_insights': service.get_teacher_insights(),
+            'alerts_summary': service.get_alerts_summary(),
+        })
+    
+    @action(detail=False, methods=['get'])
+    def teacher_dashboard(self, request):
+        """Get Teacher dashboard data with class-level information"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role or user_role.role != 'TEACHER':
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        service = TeacherDashboardService(request.user)
+        
+        class_overview = service.get_class_overview()
+        if not class_overview:
+            return Response({'error': 'No class assignment found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'class_overview': class_overview,
+            'student_fee_status': service.get_student_fee_status(),
+        })
+    
+    @action(detail=False, methods=['get'])
+    def parent_dashboard(self, request):
+        """Get Parent dashboard data with student fee information"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role or user_role.role != 'PARENT':
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        
+        service = ParentDashboardService(request.user)
+        
+        student_summary = service.get_student_summary()
+        if not student_summary:
+            return Response({'error': 'No student found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'student_summary': student_summary,
+            'payment_history': service.get_payment_history(limit=5),
+        })
+
+
+class GlobalSearchViewSet(viewsets.ViewSet):
+    """
+    ViewSet for global search across Students, Payments, and Fee Structures.
+    Query parameter 'q' or 'search' for search term.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Global search across all models"""
+        query = request.query_params.get('q') or request.query_params.get('search')
+        
+        if not query or len(query.strip()) < 2:
+            return Response({
+                'error': 'Search query must be at least 2 characters',
+                'results': {'students': [], 'payments': [], 'fees': []}
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        search_service = GlobalSearchService(user_role.school)
+        results = search_service.search_all(query, limit=10)
+        
+        return Response({
+            'query': query,
+            'results': results,
+            'total_results': len(results['students']) + len(results['payments']) + len(results['fees'])
+        })
+    
+    @action(detail=False, methods=['get'])
+    def recent_searches(self, request):
+        """Get recently searched items (simplified - just returns empty for now)"""
+        # This would be stored in a separate model if needed
+        return Response({'recent_searches': []})
+
+
+class WidgetCustomizationViewSet(viewsets.ViewSet):
+    """
+    ViewSet for customizing dashboard widgets and layout.
+    Allows users to:
+    - Show/hide widgets
+    - Reorder widgets
+    - Apply layout presets
+    - Update theme and notification settings
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def list(self, request):
+        """Get current user's widget configuration"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        config = service.export_configuration()
+        
+        return Response(config)
+    
+    @action(detail=False, methods=['get'])
+    def get_widgets(self, request):
+        """Get available widgets for user's role with customization applied"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        widgets = service.get_user_widget_configuration(user_role.role)
+        
+        return Response({
+            'widgets': widgets,
+            'role': user_role.role,
+            'total': len(widgets),
+            'visible': len([w for w in widgets if w['is_visible']])
+        })
+    
+    @action(detail=False, methods=['post'])
+    def toggle_widget(self, request):
+        """Toggle visibility of a specific widget"""
+        widget_type = request.data.get('widget_type')
+        is_visible = request.data.get('is_visible', True)
+        
+        if not widget_type:
+            return Response({'error': 'widget_type required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        service.update_widget_visibility(widget_type, is_visible)
+        
+        return Response({
+            'success': True,
+            'widget_type': widget_type,
+            'is_visible': is_visible
+        })
+    
+    @action(detail=False, methods=['post'])
+    def reorder_widgets(self, request):
+        """Update widget order"""
+        widget_order = request.data.get('widget_order', [])
+        
+        if not widget_order or not isinstance(widget_order, list):
+            return Response(
+                {'error': 'widget_order must be a non-empty list'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            service = WidgetCustomizationService(request.user, user_role.school)
+            service.update_widget_order(widget_order)
+            
+            return Response({
+                'success': True,
+                'widget_order': widget_order
+            })
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def update_theme(self, request):
+        """Update theme preference"""
+        theme = request.data.get('theme')
+        
+        if theme not in ['light', 'dark']:
+            return Response(
+                {'error': 'Theme must be light or dark'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        service.update_theme(theme)
+        
+        return Response({'success': True, 'theme': theme})
+    
+    @action(detail=False, methods=['post'])
+    def update_columns(self, request):
+        """Update layout columns"""
+        columns = request.data.get('columns')
+        
+        if not isinstance(columns, int) or columns < 1 or columns > 4:
+            return Response(
+                {'error': 'Columns must be an integer between 1 and 4'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        service.update_layout_columns(columns)
+        
+        return Response({'success': True, 'columns': columns})
+    
+    @action(detail=False, methods=['post'])
+    def apply_preset(self, request):
+        """Apply a layout preset"""
+        preset_name = request.data.get('preset')
+        
+        if preset_name not in WidgetLayoutService.get_available_presets():
+            return Response(
+                {
+                    'error': f'Unknown preset. Available: {", ".join(WidgetLayoutService.get_available_presets())}',
+                    'available_presets': WidgetLayoutService.get_available_presets()
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        WidgetLayoutService.apply_preset(request.user, user_role.school, preset_name)
+        
+        return Response({
+            'success': True,
+            'preset': preset_name,
+            'message': f'Applied {preset_name} layout preset'
+        })
+    
+    @action(detail=False, methods=['get'])
+    def presets(self, request):
+        """Get available layout presets"""
+        return Response({
+            'presets': WidgetLayoutService.get_available_presets(),
+            'descriptions': {
+                'compact': 'Compact layout (2 columns, fewer widgets)',
+                'balanced': 'Balanced layout (3 columns, standard view)',
+                'detailed': 'Detailed layout (4 columns, all widgets)',
+                'focus': 'Focus layout (1 column, key metrics only)',
+            }
+        })
+    
+    @action(detail=False, methods=['post'])
+    def reset(self, request):
+        """Reset all customizations to defaults"""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        service = WidgetCustomizationService(request.user, user_role.school)
+        service.reset_to_defaults()
+        
+        return Response({
+            'success': True,
+            'message': 'Dashboard reset to default configuration'
+        })
+    
+    @action(detail=False, methods=['post'])
+    def update_notifications(self, request):
+        """Update notification settings"""
+        show_notifications = request.data.get('show_notifications')
+        frequency = request.data.get('frequency')
+        
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            service = WidgetCustomizationService(request.user, user_role.school)
+            service.update_notification_settings(show_notifications, frequency)
+            
+            return Response({
+                'success': True,
+                'show_notifications': show_notifications,
+                'frequency': frequency
+            })
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AuditLogViewSet(viewsets.ViewSet):
+    """ViewSet for audit log operations and compliance reporting"""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def list(self, request):
+        """Get audit logs with optional filters"""
+        entity_type = request.query_params.get('entity_type')
+        entity_id = request.query_params.get('entity_id')
+        action = request.query_params.get('action')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        limit = int(request.query_params.get('limit', 50))
+        offset = int(request.query_params.get('offset', 0))
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = datetime.fromisoformat(start_date_str)
+            except ValueError:
+                pass
+        
+        if end_date_str:
+            try:
+                end_date = datetime.fromisoformat(end_date_str)
+            except ValueError:
+                pass
+        
+        try:
+            from .audit_service import AuditService
+            
+            logs = AuditService.get_audit_logs(
+                entity_type=entity_type,
+                entity_id=int(entity_id) if entity_id else None,
+                action=action,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit,
+                offset=offset
+            )
+            
+            total_count = AuditLog.objects.count()
+            
+            serializer = AuditLogSerializer(logs, many=True)
+            
+            return Response({
+                'results': serializer.data,
+                'total': total_count,
+                'limit': limit,
+                'offset': offset
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def entity_history(self, request):
+        """Get complete history for a specific entity"""
+        entity_type = request.query_params.get('entity_type')
+        entity_id = request.query_params.get('entity_id')
+        
+        if not entity_type or not entity_id:
+            return Response({'error': 'entity_type and entity_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from .audit_service import AuditService
+            
+            history = AuditService.get_entity_history(entity_type, int(entity_id))
+            serializer = AuditLogSerializer(history, many=True)
+            
+            return Response(serializer.data)
+        except ValueError:
+            return Response({'error': 'Invalid entity_id'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def user_activity(self, request):
+        """Get user activity for compliance reporting"""
+        user_id = request.query_params.get('user_id')
+        days = int(request.query_params.get('days', 30))
+        
+        if not user_id:
+            user_id = request.user.id
+        
+        try:
+            user = User.objects.get(id=user_id)
+            from .audit_service import AuditService
+            
+            activity = AuditService.get_user_activity(user, days=days)
+            serializer = AuditLogSerializer(activity, many=True)
+            
+            return Response({
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email
+                },
+                'days': days,
+                'total_actions': len(activity),
+                'logs': serializer.data
+            })
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Get audit summary statistics"""
+        entity_type = request.query_params.get('entity_type')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = datetime.fromisoformat(start_date_str)
+            except ValueError:
+                pass
+        
+        if end_date_str:
+            try:
+                end_date = datetime.fromisoformat(end_date_str)
+            except ValueError:
+                pass
+        
+        try:
+            from .audit_service import AuditService, ComplianceService
+            
+            if entity_type:
+                summary = AuditService.get_audit_summary(entity_type, start_date, end_date)
+                return Response(summary)
+            else:
+                # Return system compliance report if no entity specified
+                report = ComplianceService.get_system_compliance_report()
+                return Response(report)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def compliance_report(self, request):
+        """Generate compliance report for a user"""
+        user_id = request.query_params.get('user_id')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        
+        if not user_id:
+            user_id = request.user.id
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = datetime.fromisoformat(start_date_str)
+            except ValueError:
+                pass
+        
+        if end_date_str:
+            try:
+                end_date = datetime.fromisoformat(end_date_str)
+            except ValueError:
+                pass
+        
+        try:
+            user = User.objects.get(id=user_id)
+            from .audit_service import ComplianceService
+            
+            report = ComplianceService.get_compliance_report(user, start_date, end_date)
+            return Response(report)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Search audit logs by query"""
+        query = request.query_params.get('q', '')
+        limit = int(request.query_params.get('limit', 50))
+        
+        if not query:
+            return Response({'error': 'Query parameter "q" required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from .audit_service import AuditService
+            
+            results = AuditService.search_audit_logs(query, limit)
+            serializer = AuditLogSerializer(results, many=True)
+            
+            return Response({
+                'query': query,
+                'count': len(results),
+                'results': serializer.data
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def export(self, request):
+        """Export audit logs to JSON or CSV"""
+        entity_type = request.query_params.get('entity_type')
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+        format_type = request.query_params.get('format', 'json')
+        
+        start_date = None
+        end_date = None
+        
+        if start_date_str:
+            try:
+                start_date = datetime.fromisoformat(start_date_str)
+            except ValueError:
+                pass
+        
+        if end_date_str:
+            try:
+                end_date = datetime.fromisoformat(end_date_str)
+            except ValueError:
+                pass
+        
+        try:
+            from .audit_service import AuditService
+            
+            exported_data = AuditService.export_audit_logs(
+                entity_type=entity_type,
+                start_date=start_date,
+                end_date=end_date,
+                format=format_type
+            )
+            
+            if format_type == 'csv':
+                return Response({
+                    'format': 'csv',
+                    'data': exported_data,
+                    'filename': f'audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+                })
+            else:
+                return Response({
+                    'format': 'json',
+                    'data': json.loads(exported_data),
+                    'filename': f'audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+                })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+

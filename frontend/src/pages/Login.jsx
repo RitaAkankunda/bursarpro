@@ -44,11 +44,11 @@ const Login = () => {
       } else if (userRole === 'TEACHER') {
         navigate('/teacher-dashboard');
       } else if (userRole === 'BURSAR' || userRole === 'ACCOUNTANT') {
-        navigate('/dashboard');
+        navigate('/students');
       } else {
-        // Fallback: if role not found, redirect to dashboard anyway
-        console.warn('User role not found, redirecting to dashboard');
-        navigate('/dashboard');
+        // Fallback: if role not found, redirect to students page anyway
+        console.warn('User role not found, redirecting to students');
+        navigate('/students');
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -91,11 +91,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-orange-900 to-slate-900 flex items-center justify-center p-6 font-outfit relative overflow-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-6 font-outfit relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500 opacity-10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-500 opacity-10 blur-[120px] rounded-full" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 opacity-10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400 opacity-10 blur-[120px] rounded-full" />
       </div>
 
       <motion.div 
@@ -110,13 +110,13 @@ const Login = () => {
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex p-4 bg-gradient-to-br from-orange-400 to-amber-500 rounded-2xl mb-2 shadow-lg"
+            className="inline-flex p-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-2xl mb-2 shadow-lg"
           >
             <Wallet className="w-10 h-10 text-white" strokeWidth={2.5} />
           </motion.div>
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tight text-white">Welcome Back</h1>
-            <p className="text-orange-200 font-semibold uppercase tracking-wider text-xs">Secure Admin Portal</p>
+            <p className="text-blue-200 font-semibold uppercase tracking-wider text-xs">Secure Admin Portal</p>
           </div>
         </div>
 
@@ -124,7 +124,7 @@ const Login = () => {
           <div className="space-y-5">
             {/* Username Field */}
             <div className="space-y-2.5">
-              <label className="text-xs font-bold text-orange-100 uppercase tracking-widest block">Staff Username</label>
+              <label className="text-xs font-bold text-blue-100 uppercase tracking-widest block">Staff Username</label>
               <div className="relative">
                 <input
                   type="text"
@@ -132,7 +132,7 @@ const Login = () => {
                   spellCheck="false"
                   required
                   disabled={loading}
-                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -142,14 +142,14 @@ const Login = () => {
 
             {/* Password Field */}
             <div className="space-y-2.5">
-              <label className="text-xs font-bold text-orange-100 uppercase tracking-widest block">Secure Password</label>
+              <label className="text-xs font-bold text-blue-100 uppercase tracking-widest block">Secure Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
                   disabled={loading}
-                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-orange-400 disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-blue-400 disabled:opacity-50 disabled:cursor-not-allowed pr-12"
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -157,7 +157,7 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-300 transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-300 transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -170,7 +170,7 @@ const Login = () => {
             disabled={loading}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold rounded-xl transition-all shadow-xl active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base"
+            className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all shadow-xl active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base"
           >
             {loading ? (
               <>
@@ -188,20 +188,20 @@ const Login = () => {
 
         {/* Security Info */}
         <div className="space-y-4 pt-4 border-t border-white/10">
-          <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-orange-200">
-            <ShieldCheck size={14} className="text-orange-400" strokeWidth={2.5} />
+          <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-blue-200">
+            <ShieldCheck size={14} className="text-blue-400" strokeWidth={2.5} />
             End-to-End Encrypted Session
           </div>
 
           <div className="text-center">
             <p className="text-sm text-gray-300 font-medium">
-              New school manager? <Link to="/register" className="text-orange-300 hover:text-orange-200 transition-colors font-bold">Register here</Link>
+              New school manager? <Link to="/register" className="text-blue-300 hover:text-blue-200 transition-colors font-bold">Register here</Link>
             </p>
           </div>
 
           <div className="text-center">
             <p className="text-xs text-gray-400 font-medium">
-              👨‍👩‍👧 <Link to="/parent-login" className="text-amber-300 hover:text-amber-200 transition-colors font-bold">Parent Portal Access</Link>
+              👨‍👩‍👧 <Link to="/parent-login" className="text-blue-300 hover:text-blue-200 transition-colors font-bold">Parent Portal Access</Link>
             </p>
           </div>
         </div>

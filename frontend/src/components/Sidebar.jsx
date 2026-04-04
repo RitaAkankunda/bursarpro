@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Users, 
@@ -12,17 +13,30 @@ import {
   FileText,
   ShieldAlert,
   ArrowLeftRight,
-  LineChart
+  CheckCircle,
+  MessageSquare,
+  Menu,
+  X
 } from 'lucide-react';
 import authService from '../services/auth';
+import useMobile from '../hooks/useMobile';
 
 const Sidebar = () => {
   const [userRole, setUserRole] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useMobile();
 
   useEffect(() => {
     const role = authService.getCurrentUserRole();
     setUserRole(role);
   }, []);
+
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile]);
 
   // Base navigation items available to specified roles
   const baseNavItems = [
@@ -35,6 +49,8 @@ const Sidebar = () => {
     { to: '/payments', icon: <Receipt size={20} />, label: 'Payments', roles: ['BURSAR'] },
     { to: '/fees', icon: <BookOpen size={20} />, label: 'Fee Structures', roles: ['BURSAR'] },
     { to: '/refunds', icon: <ArrowLeftRight size={20} />, label: 'Refunds', roles: ['BURSAR'] },
+    { to: '/reconciliation', icon: <CheckCircle size={20} />, label: 'Reconciliation', roles: ['BURSAR'] },
+    { to: '/sms-reminders', icon: <MessageSquare size={20} />, label: 'SMS Reminders', roles: ['BURSAR'] },
     { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['BURSAR'] },
     { to: '/settings', icon: <Settings size={20} />, label: 'Setup', roles: ['BURSAR'] },
   ];
@@ -42,6 +58,8 @@ const Sidebar = () => {
   // Headmaster-specific items
   const headmasterItems = [
     { to: '/headmaster-dashboard', icon: <BarChart3 size={20} />, label: 'System Dashboard', roles: ['HEADMASTER'] },
+    { to: '/refunds', icon: <ArrowLeftRight size={20} />, label: 'Refunds', roles: ['HEADMASTER'] },
+    { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['HEADMASTER'] },
   ];
 
   // Teacher-specific items
@@ -49,10 +67,9 @@ const Sidebar = () => {
     { to: '/teacher-dashboard', icon: <LayoutDashboard size={20} />, label: 'My Classes', roles: ['TEACHER'] },
   ];
 
-  // Admin items (Bursar & Headmaster)
+  // Admin items (Headmaster only)
   const adminItems = [
-    { to: '/analytics', icon: <LineChart size={20} />, label: 'Analytics', roles: ['BURSAR', 'HEADMASTER'] },
-    { to: '/audit-logs', icon: <ShieldAlert size={20} />, label: 'Audit Logs', roles: ['BURSAR', 'HEADMASTER'] },
+    { to: '/audit-logs', icon: <ShieldAlert size={20} />, label: 'Audit Logs', roles: ['HEADMASTER'] },
   ];
 
   // Filter nav items based on user role
@@ -74,7 +91,39 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-72 bg-white/80 backdrop-blur-md border-r border-gray-200 flex flex-col h-screen sticky top-0 z-10 font-outfit">
+    <>
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="fixed top-4 left-4 z-50 p-2 bg-white/90 backdrop-blur-md rounded-lg border border-gray-200 hover:bg-gray-100 md:hidden"
+        >
+          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      )}
+
+      {/* Sidebar Overlay (Mobile) */}
+      <AnimatePresence>
+        {isMobile && sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar */}
+      <motion.aside
+        animate={{
+          x: isMobile && !sidebarOpen ? -400 : 0,
+        }}
+        transition={{ type: 'tween', duration: 0.3 }}
+        className="w-72 bg-white/80 backdrop-blur-md border-r border-gray-200 flex flex-col h-screen sticky top-0 z-40 font-outfit md:relative md:translate-x-0
+          fixed left-0 top-0 md:w-72 md:sticky"
+      >
       <div className="p-8 flex items-center gap-4">
         <div className="p-3 bg-blue-100 rounded-2xl">
           <Wallet className="text-blue-600 w-6 h-6" />
@@ -133,7 +182,8 @@ const Sidebar = () => {
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+      </motion.aside>
+    </>
   );
 };
 
