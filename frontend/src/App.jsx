@@ -10,12 +10,17 @@ import Settings from './pages/Settings';
 import Reports from './pages/Reports';
 import HeadmasterDashboard from './pages/HeadmasterDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
+import BursarDashboard from './pages/BursarDashboard';
+import ParentDashboard from './pages/ParentDashboard';
 import ParentLogin from './pages/ParentLogin';
 import ParentPortal from './pages/ParentPortal';
 import Refunds from './pages/Refunds';
 import Analytics from './pages/Analytics';
+import Reconciliation from './pages/Reconciliation';
+import SMSReminders from './pages/SMSReminders';
 import Phase8Dashboard from './components/Phase8Dashboard';
-import AuditLogs from './pages/AuditLogs';
+import AuditLogViewer from './pages/AuditLogViewer';
+import ComplianceReport from './pages/ComplianceReport';
 import { DashboardProvider } from './context/DashboardContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
@@ -23,13 +28,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient();
 
+// Wrapper component removed - NotificationBadge is now integrated into each page header
+// This prevents the fixed positioning issues that were blocking content
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <DashboardProvider>
-      <Toaster position="top-right" />
-      <BrowserRouter>
-        <Routes>
+        <Toaster position="top-right" />
+        <BrowserRouter>
+          <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -38,8 +46,10 @@ function App() {
           
           {/* Protected Dashboard Routes */}
           <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['BURSAR', 'ACCOUNTANT']}><Overview /></ProtectedRoute>} />
+          <Route path="/bursar-dashboard" element={<ProtectedRoute allowedRoles={['BURSAR']}><BursarDashboard /></ProtectedRoute>} />
           <Route path="/headmaster-dashboard" element={<ProtectedRoute allowedRoles={['HEADMASTER']}><HeadmasterDashboard /></ProtectedRoute>} />
           <Route path="/teacher-dashboard" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherDashboard /></ProtectedRoute>} />
+          <Route path="/parent-dashboard" element={<ProtectedRoute allowedRoles={['PARENT']}><ParentDashboard /></ProtectedRoute>} />
           <Route path="/phase8-dashboard" element={<ProtectedRoute allowedRoles={['BURSAR']}><Phase8Dashboard /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute allowedRoles={['BURSAR']}><Students /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute allowedRoles={['BURSAR']}><Payments /></ProtectedRoute>} />
@@ -47,8 +57,11 @@ function App() {
           <Route path="/refunds" element={<ProtectedRoute allowedRoles={['BURSAR']}><Refunds /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute allowedRoles={['BURSAR', 'HEADMASTER']}><Analytics /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute allowedRoles={['BURSAR', 'HEADMASTER']}><Reports /></ProtectedRoute>} />
+          <Route path="/reconciliation" element={<ProtectedRoute allowedRoles={['BURSAR']}><Reconciliation /></ProtectedRoute>} />
+          <Route path="/sms-reminders" element={<ProtectedRoute allowedRoles={['BURSAR']}><SMSReminders /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute allowedRoles={['BURSAR']}><Settings /></ProtectedRoute>} />
-          <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={['BURSAR', 'HEADMASTER']}><AuditLogs /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={['BURSAR', 'HEADMASTER']}><AuditLogViewer /></ProtectedRoute>} />
+          <Route path="/compliance-report" element={<ProtectedRoute allowedRoles={['BURSAR', 'HEADMASTER']}><ComplianceReport /></ProtectedRoute>} />
 
           {/* Wildcard Redirect to Landing */}
           <Route path="*" element={<Navigate to="/" />} />
