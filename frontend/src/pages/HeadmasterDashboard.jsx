@@ -286,14 +286,57 @@ const HeadmasterDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-100 p-6 pb-20">
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Headmaster Dashboard</h1>
-            <p className="text-gray-600 font-medium">School financial overview and payment analytics</p>
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+          <div className="flex-1 space-y-3">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Headmaster Dashboard</h1>
+              {data?.school && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">School</p>
+                  <p className="text-2xl font-bold text-orange-600">{data.school.name}</p>
+                  {data.school.address && (
+                    <p className="text-sm text-gray-600 mt-1">{data.school.address}</p>
+                  )}
+                </div>
+              )}
+              <p className="text-gray-600 font-medium mt-2">School financial overview and payment analytics</p>
+            </div>
+
+            {/* School Admins Section */}
+            {data?.school_admins && data.school_admins.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200"
+              >
+                <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                  <Users size={14} className="text-orange-600" />
+                  Other Administrators
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {data.school_admins.map((admin, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-white/60 p-2 rounded backdrop-blur-sm text-sm">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-amber-400 flex items-center justify-center text-white font-bold text-xs">
+                        {(admin.user__first_name?.[0] || admin.user__username?.[0] || 'A').toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-800 text-xs">
+                          {admin.user__first_name} {admin.user__last_name}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {admin.role === 'BURSAR' ? 'Bursar' : 'Headmaster'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </div>
+
           <button
             onClick={handleLogout}
-            className="p-3 bg-white hover:bg-gray-100 rounded-lg transition border border-gray-200 w-fit"
+            className="p-3 bg-white hover:bg-gray-100 rounded-lg transition border border-gray-200 h-fit"
             title="Logout"
           >
             <LogOut size={20} className="text-gray-700" />

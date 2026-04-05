@@ -43,7 +43,7 @@ const Login = () => {
         navigate('/headmaster-dashboard');
       } else if (userRole === 'TEACHER') {
         navigate('/teacher-dashboard');
-      } else if (userRole === 'BURSAR' || userRole === 'ACCOUNTANT') {
+      } else if (userRole === 'BURSAR') {
         navigate('/students');
       } else {
         // Fallback: if role not found, redirect to students page anyway

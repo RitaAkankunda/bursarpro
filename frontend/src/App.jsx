@@ -11,7 +11,6 @@ import Reports from './pages/Reports';
 import HeadmasterDashboard from './pages/HeadmasterDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import BursarDashboard from './pages/BursarDashboard';
-import ParentDashboard from './pages/ParentDashboard';
 import ParentLogin from './pages/ParentLogin';
 import ParentPortal from './pages/ParentPortal';
 import Refunds from './pages/Refunds';
@@ -45,11 +44,10 @@ function App() {
           <Route path="/parent-portal" element={<ParentPortal />} />
           
           {/* Protected Dashboard Routes */}
-          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['BURSAR', 'ACCOUNTANT']}><Overview /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['BURSAR']}><Overview /></ProtectedRoute>} />
           <Route path="/bursar-dashboard" element={<ProtectedRoute allowedRoles={['BURSAR']}><BursarDashboard /></ProtectedRoute>} />
           <Route path="/headmaster-dashboard" element={<ProtectedRoute allowedRoles={['HEADMASTER']}><HeadmasterDashboard /></ProtectedRoute>} />
           <Route path="/teacher-dashboard" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherDashboard /></ProtectedRoute>} />
-          <Route path="/parent-dashboard" element={<ProtectedRoute allowedRoles={['PARENT']}><ParentDashboard /></ProtectedRoute>} />
           <Route path="/phase8-dashboard" element={<ProtectedRoute allowedRoles={['BURSAR']}><Phase8Dashboard /></ProtectedRoute>} />
           <Route path="/students" element={<ProtectedRoute allowedRoles={['BURSAR']}><Students /></ProtectedRoute>} />
           <Route path="/payments" element={<ProtectedRoute allowedRoles={['BURSAR']}><Payments /></ProtectedRoute>} />

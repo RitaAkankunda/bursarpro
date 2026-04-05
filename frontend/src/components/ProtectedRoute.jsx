@@ -13,7 +13,6 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
     // If authenticated but unauthorized mapped route based on their actual role
     const roleRoutes = {
       'BURSAR': '/dashboard',
-      'ACCOUNTANT': '/dashboard',
       'HEADMASTER': '/headmaster-dashboard',
       'TEACHER': '/teacher-dashboard',
       'PARENT': '/parent-portal',

@@ -199,21 +199,70 @@ const BursarDashboard = () => {
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8 flex items-center justify-between"
+        className="mb-8"
       >
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 mb-2">Bursar Dashboard</h1>
-          <p className="text-gray-600">Real-time payment collection and financial insights</p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-4xl font-black text-gray-900 mb-2">Bursar Dashboard</h1>
+            {data?.school && (
+              <div className="flex items-center gap-4 mb-3">
+                <div>
+                  <p className="text-sm text-gray-500">School</p>
+                  <p className="text-xl font-bold text-blue-600">{data.school.name}</p>
+                  {data.school.address && (
+                    <p className="text-sm text-gray-600 mt-1">{data.school.address}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <p className="text-gray-600">Real-time payment collection and financial insights</p>
+          </div>
+          <motion.button
+            onClick={() => setIsCustomizerOpen(true)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:shadow-lg transition-all"
+          >
+            <Settings size={18} />
+            Customize
+          </motion.button>
         </div>
-        <motion.button
-          onClick={() => setIsCustomizerOpen(true)}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-lg hover:shadow-lg transition-all"
-        >
-          <Settings size={18} />
-          Customize
-        </motion.button>
+
+        {/* School Admins Section */}
+        {data?.school_admins && data.school_admins.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200"
+          >
+            <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <Users size={16} className="text-blue-600" />
+              Other Administrators
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {data.school_admins.map((admin, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-white/60 p-3 rounded-lg backdrop-blur-sm">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center text-white font-bold">
+                    {(admin.user__first_name?.[0] || admin.user__username?.[0] || 'A').toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-800 text-sm">
+                      {admin.user__first_name} {admin.user__last_name}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Bursar
+                    </p>
+                  </div>
+                  {admin.user__email && (
+                    <a href={`mailto:${admin.user__email}`} className="text-blue-600 hover:text-blue-800 text-xs">
+                      ✉
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* Tab Navigation */}

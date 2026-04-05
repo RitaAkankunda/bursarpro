@@ -510,64 +510,6 @@ const Overview = () => {
                 </div>
               </motion.div>
 
-              {/* Collection Gauge & Progress */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 0.5 }}
-                className="lg:col-span-2 backdrop-blur-md bg-white/70 rounded-2xl p-8 border border-white/40 shadow-lg"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900">Collection Progress</h3>
-                    <p className="text-gray-600 text-sm mt-1">Term: {dashboardStats.term}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-5xl font-black text-orange-600">{dashboardStats.collection_rate_percent}%</p>
-                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Collection Rate</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-700">Collected</span>
-                      <span className="text-sm font-bold text-green-600">UGX {dashboardStats.total_collected?.toLocaleString()}</span>
-                    </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (dashboardStats.total_collected / dashboardStats.total_expected) * 100)}%` }}
-                        transition={{ duration: 1.5, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-green-500 to-emerald-600 rounded-full"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-700">Outstanding</span>
-                      <span className="text-sm font-bold text-red-600">UGX {dashboardStats.total_outstanding?.toLocaleString()}</span>
-                    </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, (dashboardStats.total_outstanding / dashboardStats.total_expected) * 100)}%` }}
-                        transition={{ duration: 1.5, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-red-500 to-rose-600 rounded-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-xl flex gap-3">
-                  <div className="text-blue-600 flex-shrink-0 mt-1">ℹ️</div>
-                  <div className="text-sm text-blue-900 font-medium">
-                    <strong>Quick Action:</strong> Send SMS reminders to unpaid students to increase collection rate.
-                  </div>
-                </div>
-              </motion.div>
-
               {/* Unpaid Students List */}
               <UnpaidStudentsCard 
                 students={dashboardStats.unpaid_students || []}
@@ -590,15 +532,55 @@ const Overview = () => {
                     <Loader2 className="text-orange-600 animate-spin" size={28} />
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={350}>
                     <LineChart data={analyticsData || []}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="name" stroke="#9ca3af" />
-                      <YAxis stroke="#9ca3af" />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="Expected" stroke="#3b82f6" />
-                      <Line type="monotone" dataKey="Collected" stroke="#10b981" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                      <XAxis 
+                        dataKey="name" 
+                        stroke="#6b7280"
+                        style={{ fontSize: '13px', fontWeight: '500' }}
+                      />
+                      <YAxis 
+                        stroke="#6b7280"
+                        style={{ fontSize: '13px', fontWeight: '500' }}
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                        label={{ value: 'Amount (UGX)', angle: -90, position: 'insideLeft', style: { fontSize: '13px', fontWeight: '600' } }}
+                      />
+                      <Tooltip 
+                        contentStyle={{
+                          backgroundColor: '#fef3c7',
+                          border: '1px solid #fbbf24',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: '500'
+                        }}
+                        formatter={(value) => [
+                          `UGX ${parseInt(value || 0).toLocaleString()}`,
+                          ''
+                        ]}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: '16px', fontSize: '13px', fontWeight: '500' }}
+                        iconType="line"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="Expected" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#3b82f6' }}
+                        activeDot={{ r: 7 }}
+                        name="Expected"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="Collected" 
+                        stroke="#10b981" 
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#10b981' }}
+                        activeDot={{ r: 7 }}
+                        name="Collected"
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
