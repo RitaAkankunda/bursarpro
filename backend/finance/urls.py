@@ -8,7 +8,7 @@ from .views import (
     BulkPaymentViewSet, BankStatementViewSet, PaymentReconciliationViewSet, ReconciliationDiscrepancyViewSet,
     SMSReminderConfigurationViewSet, SMSReminderViewSet, SMSReminderHistoryViewSet, SMSReminderTemplateViewSet,
     DashboardWidgetViewSet, DashboardPreferenceViewSet, DashboardAlertViewSet, RoleDashboardViewSet, 
-    GlobalSearchViewSet, WidgetCustomizationViewSet, AuditLogViewSet
+    GlobalSearchViewSet, WidgetCustomizationViewSet, AuditLogViewSet, ActivityLogViewSet
 )
 from .phase8_viewsets import (
     ReportTemplateViewSet, ScheduledReportViewSet, ReportExecutionViewSet,
@@ -68,6 +68,7 @@ router.register(r'refunds', RefundViewSet, basename='refund')
 router.register(r'payment-reversals', PaymentReversalViewSet, basename='payment-reversal')
 router.register(r'refund-notifications', RefundNotificationViewSet, basename='refund-notification')
 router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
+router.register(r'activity-logs', ActivityLogViewSet, basename='activity-log')
 
 # Dashboard
 router.register(r'dashboard-widgets', DashboardWidgetViewSet, basename='dashboard-widget')

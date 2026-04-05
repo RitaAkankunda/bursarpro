@@ -9,10 +9,8 @@ class UserRole(models.Model):
     ROLE_CHOICES = [
         ('BURSAR', 'Bursar/Admin'),
         ('HEADMASTER', 'Headmaster'),
-        ('ACCOUNTANT', 'Accountant'),
         ('TEACHER', 'Teacher'),
         ('PARENT', 'Parent'),
-        ('STUDENT', 'Student'),
     ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='role')
@@ -34,6 +32,14 @@ class School(models.Model):
     name = models.CharField(max_length=255)
     address = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='schools', null=True, blank=True)
+    # School-specific student ID format (e.g., "STU0001", "A001", "2024-001", etc.)
+    # Leave empty for free-form entry, or set a pattern for reference (no validation applied)
+    student_id_format = models.CharField(
+        max_length=100, 
+        blank=True, 
+        null=True,
+        help_text="Example: STU0001, A001, 2024-001. This is for documentation only - actual IDs are entered freely."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -597,6 +603,62 @@ class DashboardPreference(models.Model):
     
     def __str__(self):
         return f'{self.user.username} - Dashboard Preferences'
+
+
+class ActivityLog(models.Model):
+    """
+    Track all activities within a school for auditing and real-time notifications.
+    """
+    ACTIVITY_TYPES = [
+        ('PAYMENT', 'Payment Recorded'),
+        ('REFUND', 'Refund Processed'),
+        ('STUDENT_CREATED', 'Student Created'),
+        ('STUDENT_UPDATED', 'Student Updated'),
+        ('FEE_UPDATED', 'Fee Updated'),
+        ('SMS_SENT', 'SMS Reminder Sent'),
+        ('TERM_CREATED', 'Term Created'),
+        ('RECONCILIATION', 'Bank Reconciliation'),
+        ('ALERT_GENERATED', 'Payment Alert'),
+        ('USER_LOGIN', 'User Login'),
+        ('REPORT_GENERATED', 'Report Generated'),
+        ('OTHER', 'Other Activity'),
+    ]
+    
+    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='activity_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='activities')
+    
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
+    title = models.CharField(max_length=255, help_text='Short title of the activity')
+    description = models.TextField(blank=True, help_text='Detailed description')
+    
+    # Related objects for context
+    student = models.ForeignKey(Student, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
+    payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, null=True, blank=True, related_name='activity_logs')
+    
+    # For role-based filtering
+    visible_to_roles = models.JSONField(
+        default=list,
+        help_text='List of roles that can see this activity (e.g., ["BURSAR", "HEADMASTER"])'
+    )
+    
+    # Additional metadata
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Additional context data as JSON'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['school', '-created_at']),
+            models.Index(fields=['school', 'activity_type', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.school.name} - {self.get_activity_type_display()} - {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
 
 class DashboardAlert(models.Model):

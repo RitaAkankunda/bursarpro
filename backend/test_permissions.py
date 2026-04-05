@@ -62,18 +62,6 @@ if _:
 else:
     print(f"   ℹ️  BURSAR user already exists: test_bursar")
 
-# Create ACCOUNTANT user
-accountant_user, _ = User.objects.get_or_create(
-    username='test_accountant',
-    defaults={'email': 'accountant@test.com'}
-)
-if _:
-    accountant_user.set_password('password123')
-    accountant_user.save()
-    print(f"   ✅ Created ACCOUNTANT user: test_accountant")
-else:
-    print(f"   ℹ️  ACCOUNTANT user already exists: test_accountant")
-
 # Get or create school
 school, created = School.objects.get_or_create(
     name='Test School',

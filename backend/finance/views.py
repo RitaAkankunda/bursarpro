@@ -2183,7 +2183,28 @@ class RoleDashboardViewSet(viewsets.ViewSet):
         from django.utils import timezone
         service = BursarDashboardService(user_role.school)
         
+        # Get school information
+        school_info = {
+            'id': user_role.school.id,
+            'name': user_role.school.name,
+            'address': user_role.school.address,
+        }
+        
+        # Get other admins/bursars from the same school
+        other_admins = UserRole.objects.filter(
+            school=user_role.school,
+            role__in=['BURSAR', 'ACCOUNTANT']
+        ).exclude(user=request.user).values(
+            'user__username',
+            'user__first_name',
+            'user__last_name',
+            'user__email',
+            'role'
+        )
+        
         return Response({
+            'school': school_info,
+            'school_admins': list(other_admins),
             'payment_summary': service.get_payment_summary(),
             'top_outstanding_students': service.get_top_outstanding_students(limit=5),
             'recent_payments': service.get_recent_payments(limit=10),
@@ -2201,7 +2222,28 @@ class RoleDashboardViewSet(viewsets.ViewSet):
         
         service = HeadmasterDashboardService(user_role.school)
         
+        # Get school information
+        school_info = {
+            'id': user_role.school.id,
+            'name': user_role.school.name,
+            'address': user_role.school.address,
+        }
+        
+        # Get other admins from the same school (Bursars, Accountants, and Headmasters)
+        other_admins = UserRole.objects.filter(
+            school=user_role.school,
+            role__in=['BURSAR', 'ACCOUNTANT', 'HEADMASTER']
+        ).exclude(user=request.user).values(
+            'user__username',
+            'user__first_name',
+            'user__last_name',
+            'user__email',
+            'role'
+        )
+        
         return Response({
+            'school': school_info,
+            'school_admins': list(other_admins),
             'school_overview': service.get_school_overview(),
             'class_performance': service.get_class_performance(),
             'payment_trends': service.get_payment_trends(),
@@ -2731,6 +2773,86 @@ class AuditLogViewSet(viewsets.ViewSet):
                 })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivityLogViewSet(viewsets.ViewSet):
+    """ViewSet for activity logging and real-time school notifications."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def school_activity_feed(self, request):
+        """Get activity feed for the user's school, role-filtered."""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        limit = int(request.query_params.get('limit', 50))
+        offset = int(request.query_params.get('offset', 0))
+        activity_type = request.query_params.get('activity_type')
+        
+        from .activity_service import ActivityLogger
+        from .models import ActivityLog
+        
+        # Get filtered activity feed
+        query = ActivityLog.objects.filter(
+            school=user_role.school,
+            visible_to_roles__contains=user_role.role
+        )
+        
+        if activity_type:
+            query = query.filter(activity_type=activity_type)
+        
+        activities = query.order_by('-created_at')[offset:offset + limit]
+        total_count = query.count()
+        
+        from .serializers import ActivityLogSerializer
+        serializer = ActivityLogSerializer(activities, many=True)
+        
+        return Response({
+            'results': serializer.data,
+            'total': total_count,
+            'limit': limit,
+            'offset': offset,
+            'user_role': user_role.get_role_display(),
+            'school': {
+                'id': user_role.school.id,
+                'name': user_role.school.name,
+            }
+        })
+    
+    @action(detail=False, methods=['get'])
+    def activity_types(self, request):
+        """Get available activity types."""
+        from .models import ActivityLog
+        
+        return Response({
+            'activity_types': [
+                {'value': code, 'label': label}
+                for code, label in ActivityLog.ACTIVITY_TYPES
+            ]
+        })
+    
+    @action(detail=False, methods=['get'])
+    def recent_activities(self, request):
+        """Get most recent activities for dashboard."""
+        user_role = UserRole.objects.filter(user=request.user).first()
+        if not user_role:
+            return Response({'error': 'User role not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        limit = int(request.query_params.get('limit', 10))
+        
+        from .models import ActivityLog
+        
+        activities = ActivityLog.objects.filter(
+            school=user_role.school,
+            visible_to_roles__contains=user_role.role
+        ).order_by('-created_at')[:limit]
+        
+        from .serializers import ActivityLogSerializer
+        serializer = ActivityLogSerializer(activities, many=True)
+        
+        return Response(serializer.data)
 
 
 

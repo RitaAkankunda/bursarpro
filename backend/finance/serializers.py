@@ -516,3 +516,60 @@ class AuditLogSerializer(serializers.Serializer):
     def get_timestamp_display(self, obj):
         return obj.timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """Serializer for ActivityLog entries with human-readable details."""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True, allow_null=True)
+    user_username = serializers.CharField(source='user.username', read_only=True, allow_null=True)
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    student_name = serializers.SerializerMethodField()
+    activity_type_display = serializers.CharField(source='get_activity_type_display', read_only=True)
+    formatted_time = serializers.SerializerMethodField()
+    
+    class Meta:
+        from .models import ActivityLog
+        model = ActivityLog
+        fields = [
+            'id', 'school', 'school_name',
+            'user', 'user_name', 'user_username',
+            'activity_type', 'activity_type_display',
+            'title', 'description',
+            'student', 'student_name',
+            'payment',
+            'visible_to_roles',
+            'metadata',
+            'created_at', 'formatted_time'
+        ]
+        read_only_fields = [
+            'id', 'school_name', 'user_name', 'user_username',
+            'activity_type_display', 'created_at', 'formatted_time', 'student_name'
+        ]
+    
+    def get_student_name(self, obj):
+        if obj.student:
+            return f"{obj.student.first_name} {obj.student.last_name}"
+        return None
+    
+    def get_formatted_time(self, obj):
+        """Return formatted time like '2 hours ago' or actual time."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        diff = now - obj.created_at
+        
+        if diff < timedelta(minutes=1):
+            return "Just now"
+        elif diff < timedelta(hours=1):
+            minutes = diff.total_seconds() // 60
+            return f"{int(minutes)} minute{'s' if minutes > 1 else ''} ago"
+        elif diff < timedelta(days=1):
+            hours = diff.total_seconds() // 3600
+            return f"{int(hours)} hour{'s' if hours > 1 else ''} ago"
+        elif diff < timedelta(days=7):
+            days = diff.days
+            return f"{days} day{'s' if days > 1 else ''} ago"
+        else:
+            return obj.created_at.strftime('%Y-%m-%d %H:%M')
+
+
