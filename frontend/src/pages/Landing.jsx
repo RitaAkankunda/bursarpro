@@ -401,11 +401,11 @@ const Landing = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="py-12 text-center mb-16 flex flex-col items-center gap-6"
+          className="py-6 text-center mb-8 flex flex-col items-center gap-4"
         >
           <motion.div 
             whileHover={{ scale: 1.05 }}
-            className="backdrop-blur-xl bg-gradient-to-r from-blue-50/80 to-purple-50/80 border border-blue-200/60 rounded-3xl px-8 py-8 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-8 shadow-lg hover:shadow-2xl transition-all"
+            className="backdrop-blur-xl bg-gradient-to-r from-blue-50/80 to-purple-50/80 border border-blue-200/60 rounded-3xl px-6 py-5 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 shadow-lg hover:shadow-2xl transition-all"
           >
             <div className="flex -space-x-4">
               {[ { bg: 'from-blue-500 to-blue-600', letter: 'G' }, { bg: 'from-green-500 to-teal-600', letter: 'R' }, { bg: 'from-orange-500 to-orange-600', letter: 'P' }, { bg: 'from-yellow-400 to-yellow-500', letter: 'J', textColor: 'text-gray-900' } ].map((avatar, i) => (
@@ -443,15 +443,15 @@ const Landing = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="py-10 text-center space-y-8 mb-16"
+          className="py-4 text-center space-y-4 mb-8"
         >
-          <div className="space-y-1">
+          <div>
             <motion.p 
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               transition={{ delay: 0.1 }}
               viewport={{ once: true }}
-              className="text-blue-600 font-bold uppercase tracking-widest text-sm"
+              className="text-blue-600 font-bold uppercase tracking-widest text-xs mb-1"
             >
               Trusted By Schools Across Uganda
             </motion.p>
@@ -460,13 +460,13 @@ const Landing = () => {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
               viewport={{ once: true }}
-              className="text-4xl font-black text-gray-900"
+              className="text-3xl font-black text-gray-900"
             >
               Partners Including
             </motion.h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center justify-center">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-center justify-center">
             {[
               "🏫 Kampala Parents' School",
               "🏫 Gayaza High School", 
@@ -490,15 +490,15 @@ const Landing = () => {
         </motion.section>
 
         {/* Stats Section */}
-        <section id="stats" className="py-12 mb-16">
+        <section id="stats" className="py-8 mb-8">
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8 md:p-10"
+            className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 md:p-8"
           >
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
               {[
                 { number: '50+', label: 'Schools' },
                 { number: '15K+', label: 'Students' },
