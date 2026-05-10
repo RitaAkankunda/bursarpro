@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Wallet, LogIn, Loader2, AlertCircle, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Layers, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import authService from '../services/auth';
 import toast from 'react-hot-toast';
@@ -15,75 +15,23 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    // Validate inputs
-    if (!username.trim()) {
-      toast.error('Username is required');
-      return;
-    }
-    if (!password.trim()) {
-      toast.error('Password is required');
-      return;
-    }
+    if (!username.trim()) { toast.error('Username is required'); return; }
+    if (!password.trim()) { toast.error('Password is required'); return; }
 
     setLoading(true);
-
     try {
       await authService.login(username, password);
-      
-      // Wait a moment for role to be set, then check
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       toast.success('Successfully logged in!');
-      
-      // Get user role and redirect accordingly
       const userRole = localStorage.getItem('userRole');
-      console.log('User role after login:', userRole);
-      
-      if (userRole === 'HEADMASTER') {
-        navigate('/headmaster-dashboard');
-      } else if (userRole === 'TEACHER') {
-        navigate('/teacher-dashboard');
-      } else if (userRole === 'BURSAR') {
-        navigate('/students');
-      } else {
-        // Fallback: if role not found, redirect to students page anyway
-        console.warn('User role not found, redirecting to students');
-        navigate('/students');
-      }
+      if (userRole === 'HEADMASTER') navigate('/headmaster-dashboard');
+      else if (userRole === 'TEACHER') navigate('/teacher-dashboard');
+      else navigate('/dashboard');
     } catch (err) {
-      console.error('Login error:', err);
-      
-      // Extract better error messages
       let errorMsg = '';
-      
-      if (!err.response) {
-        // Network error
-        errorMsg = 'Network error - Cannot connect to server. Check your connection.';
-      } else if (err.response.status === 401) {
-        // Authentication failed
-        errorMsg = 'Invalid username or password. Please check and try again.';
-      } else if (err.response.status === 400) {
-        // Bad request - field errors
-        const data = err.response.data;
-        if (data.username) {
-          errorMsg = data.username[0] || 'Invalid username format';
-        } else if (data.password) {
-          errorMsg = data.password[0] || 'Invalid password format';
-        } else if (data.detail) {
-          errorMsg = data.detail;
-        } else {
-          errorMsg = 'Invalid input. Please check your entries.';
-        }
-      } else if (err.response.status === 404) {
-        errorMsg = 'User not found. Please check your username.';
-      } else if (err.response.status === 500) {
-        errorMsg = 'Server error. Please try again later.';
-      } else {
-        errorMsg = err.response?.data?.detail || 
-                   err.response?.data?.non_field_errors?.[0] ||
-                   'Login failed. Please verify your credentials.';
-      }
-      
+      if (!err.response) errorMsg = 'Network error - Cannot connect to server.';
+      else if (err.response.status === 401) errorMsg = 'Invalid username or password.';
+      else errorMsg = err.response?.data?.detail || 'Login failed. Please verify your credentials.';
       toast.error(errorMsg);
     } finally {
       setLoading(false);
@@ -91,123 +39,232 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-6 font-outfit relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 opacity-10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400 opacity-10 blur-[120px] rounded-full" />
-      </div>
+    <div style={styles.page}>
+      {/* Background blobs */}
+      <div style={styles.blobTL} />
+      <div style={styles.blobBR} />
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+      <motion.div
+        initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="backdrop-blur-xl bg-white/10 border border-white/20 w-full max-w-md p-8 space-y-8 rounded-3xl shadow-2xl relative z-10"
+        transition={{ duration: 0.55, ease: 'easeOut' }}
+        style={styles.card}
       >
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <motion.div 
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex p-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-2xl mb-2 shadow-lg"
-          >
-            <Wallet className="w-10 h-10 text-white" strokeWidth={2.5} />
-          </motion.div>
-          <div className="space-y-2">
-            <h1 className="text-4xl font-black tracking-tight text-white">Welcome Back</h1>
-            <p className="text-blue-200 font-semibold uppercase tracking-wider text-xs">Secure Admin Portal</p>
+        {/* Logo */}
+        <div style={styles.logoWrap}>
+          <div style={styles.logoCircle}>
+            <Layers size={26} color="#38bdf8" strokeWidth={2} />
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-5">
-            {/* Username Field */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-bold text-blue-100 uppercase tracking-widest block">Staff Username</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  autoComplete="off"
-                  spellCheck="false"
-                  required
-                  disabled={loading}
-                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-            </div>
+        {/* Title */}
+        <h1 style={styles.title}>BURSAR PRO</h1>
+        <p style={styles.subtitle}>Secure School Fees Management System</p>
 
-            {/* Password Field */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-bold text-blue-100 uppercase tracking-widest block">Secure Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  required
-                  disabled={loading}
-                  className="w-full px-4 py-3.5 bg-white/10 backdrop-blur border border-white/30 rounded-xl outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all text-sm font-medium placeholder:text-gray-400 text-white caret-blue-400 disabled:opacity-50 disabled:cursor-not-allowed pr-12"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+        <form onSubmit={handleLogin} style={styles.form}>
+          {/* Username */}
+          <div style={styles.fieldGroup}>
+            <label style={styles.label}>Staff Username</label>
+            <div style={styles.inputWrap}>
+              <input
+                type="text"
+                autoComplete="off"
+                spellCheck="false"
+                required
+                disabled={loading}
+                style={styles.input}
+                placeholder="Enter your username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                onFocus={e => Object.assign(e.target.style, styles.inputFocus)}
+                onBlur={e => Object.assign(e.target.style, styles.inputBlur)}
+              />
             </div>
           </div>
 
+          {/* Password */}
+          <div style={styles.fieldGroup}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={styles.label}>Password</label>
+              <Link to="/forgot-password" style={styles.forgotLink}>Forgot Password?</Link>
+            </div>
+            <div style={{ ...styles.inputWrap, position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                disabled={loading}
+                style={{ ...styles.input, paddingRight: '44px' }}
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onFocus={e => Object.assign(e.target.style, styles.inputFocus)}
+                onBlur={e => Object.assign(e.target.style, styles.inputBlur)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={styles.eyeBtn}
+              >
+                {showPassword ? <EyeOff size={17} color="#64748b" /> : <Eye size={17} color="#64748b" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Submit */}
           <motion.button
             type="submit"
             disabled={loading}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold rounded-xl transition-all shadow-xl active:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 text-base"
+            whileHover={{ scale: 1.025 }}
+            whileTap={{ scale: 0.975 }}
+            style={styles.submitBtn}
           >
             {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Validating...</span>
-              </>
-            ) : (
-              <>
-                <span>Access Dashboard</span>
-                <ArrowRight size={20} strokeWidth={3} />
-              </>
-            )}
+              <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Validating…</>
+            ) : 'Sign In to Portal'}
           </motion.button>
         </form>
 
-        {/* Security Info */}
-        <div className="space-y-4 pt-4 border-t border-white/10">
-          <div className="flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider text-blue-200">
-            <ShieldCheck size={14} className="text-blue-400" strokeWidth={2.5} />
-            End-to-End Encrypted Session
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-300 font-medium">
-              New school manager? <Link to="/register" className="text-blue-300 hover:text-blue-200 transition-colors font-bold">Register here</Link>
-            </p>
-          </div>
-
-          <div className="text-center">
-            <p className="text-xs text-gray-400 font-medium">
-              👨‍👩‍👧 <Link to="/parent-login" className="text-blue-300 hover:text-blue-200 transition-colors font-bold">Parent Portal Access</Link>
-            </p>
-          </div>
+        {/* Divider */}
+        <div style={styles.divider}>
+          <span style={styles.dividerLine} />
+          <span style={styles.dividerText}>Quick Access</span>
+          <span style={styles.dividerLine} />
         </div>
+
+        {/* Quick access icons */}
+        <div style={styles.quickRow}>
+          {['🏫', '📅', '🕐'].map((icon, i) => (
+            <button key={i} style={styles.quickBtn}>{icon}</button>
+          ))}
+        </div>
+
+        {/* Footer links */}
+        <p style={styles.footerText}>
+          New to the system?{' '}
+          <Link to="/register" style={styles.link}>Request Access</Link>
+        </p>
+        <p style={styles.footerText}>
+          <Link to="/parent-login" style={styles.link}>👨‍👩‍👧 Parent Portal Access</Link>
+        </p>
+
+        <p style={styles.version}>Secure connection • v1.0.0</p>
       </motion.div>
+
+      {/* Page footer */}
+      <p style={styles.pageFooter}>© 2025 BursarPro School Management System. All Data Protected.</p>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        * { box-sizing: border-box; }
+      `}</style>
     </div>
   );
+};
+
+const INPUT_BG = 'rgba(15,23,42,0.55)';
+const CARD_BG = 'rgba(10,22,40,0.82)';
+const BORDER = '1px solid rgba(56,189,248,0.15)';
+const BORDER_FOCUS = '1px solid rgba(56,189,248,0.6)';
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    width: '100%',
+    background: 'linear-gradient(135deg, #0a1628 0%, #062236 50%, #0a1f2e 100%)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px',
+    fontFamily: "'Inter', 'Outfit', system-ui, sans-serif",
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  blobTL: {
+    position: 'absolute', top: '-80px', right: '-80px',
+    width: '420px', height: '420px',
+    background: 'radial-gradient(circle, rgba(6,182,212,0.18) 0%, transparent 70%)',
+    borderRadius: '50%', pointerEvents: 'none',
+  },
+  blobBR: {
+    position: 'absolute', bottom: '-80px', left: '-80px',
+    width: '380px', height: '380px',
+    background: 'radial-gradient(circle, rgba(14,165,233,0.12) 0%, transparent 70%)',
+    borderRadius: '50%', pointerEvents: 'none',
+  },
+  card: {
+    position: 'relative', zIndex: 10,
+    background: CARD_BG,
+    border: '1px solid rgba(56,189,248,0.18)',
+    borderRadius: '20px',
+    padding: '40px 36px 32px',
+    width: '100%', maxWidth: '420px',
+    boxShadow: '0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(56,189,248,0.08)',
+    backdropFilter: 'blur(20px)',
+    textAlign: 'center',
+  },
+  logoWrap: { display: 'flex', justifyContent: 'center', marginBottom: '18px' },
+  logoCircle: {
+    width: '56px', height: '56px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, #0c2d4a, #0e3a5c)',
+    border: '2px solid rgba(56,189,248,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 0 20px rgba(56,189,248,0.25)',
+  },
+  title: {
+    fontSize: '22px', fontWeight: '800', letterSpacing: '3px',
+    color: '#f0f9ff', margin: '0 0 6px',
+  },
+  subtitle: {
+    fontSize: '12px', color: '#38bdf8', letterSpacing: '0.5px',
+    marginBottom: '28px', opacity: 0.85,
+  },
+  form: { textAlign: 'left' },
+  fieldGroup: { marginBottom: '18px' },
+  label: { display: 'block', fontSize: '11px', fontWeight: '600', color: '#94a3b8', marginBottom: '7px', letterSpacing: '0.5px' },
+  inputWrap: {},
+  input: {
+    width: '100%', padding: '11px 14px',
+    background: INPUT_BG, border: BORDER,
+    borderRadius: '10px', outline: 'none', color: '#e2e8f0',
+    fontSize: '14px', fontFamily: 'inherit',
+    transition: 'border 0.2s, box-shadow 0.2s',
+  },
+  inputFocus: { border: BORDER_FOCUS, boxShadow: '0 0 0 3px rgba(56,189,248,0.12)' },
+  inputBlur: { border: BORDER, boxShadow: 'none' },
+  eyeBtn: {
+    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+  },
+  forgotLink: { fontSize: '11px', color: '#38bdf8', textDecoration: 'none', fontWeight: '600' },
+  submitBtn: {
+    width: '100%', padding: '13px',
+    background: 'linear-gradient(90deg, #0ea5e9, #38bdf8)',
+    border: 'none', borderRadius: '10px',
+    color: '#fff', fontWeight: '700', fontSize: '15px',
+    cursor: 'pointer', letterSpacing: '0.5px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    marginTop: '6px',
+    boxShadow: '0 4px 20px rgba(14,165,233,0.4)',
+    fontFamily: 'inherit',
+  },
+  divider: { display: 'flex', alignItems: 'center', gap: '10px', margin: '24px 0 16px' },
+  dividerLine: { flex: 1, height: '1px', background: 'rgba(255,255,255,0.08)' },
+  dividerText: { fontSize: '11px', color: '#475569', whiteSpace: 'nowrap' },
+  quickRow: { display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '20px' },
+  quickBtn: {
+    width: '48px', height: '44px', borderRadius: '10px',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  footerText: { fontSize: '13px', color: '#64748b', marginBottom: '6px', marginTop: '4px' },
+  link: { color: '#38bdf8', textDecoration: 'none', fontWeight: '600' },
+  version: { fontSize: '11px', color: '#334155', marginTop: '16px' },
+  pageFooter: {
+    position: 'absolute', bottom: '18px',
+    fontSize: '12px', color: '#334155', zIndex: 10, textAlign: 'center',
+  },
 };
 
 export default Login;

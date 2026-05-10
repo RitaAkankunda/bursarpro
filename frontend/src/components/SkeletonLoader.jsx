@@ -1,32 +1,29 @@
-import { motion } from 'framer-motion';
-
 export const TableSkeleton = ({ rows = 5 }) => {
   return (
     <>
       {Array.from({ length: rows }).map((_, idx) => (
-        <tr key={idx} className="border-b border-gray-200">
-          <td className="px-8 py-5">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
-              <div className="space-y-2">
-                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
-                <div className="h-3 w-24 bg-gray-100 rounded animate-pulse" />
+        <tr key={idx} style={{ borderBottom: '1px solid rgba(56,189,248,0.08)' }}>
+          <td style={{ padding: '16px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={skStyles.circle} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ ...skStyles.bar, width: '120px' }} />
+                <div style={{ ...skStyles.bar, width: '90px', opacity: 0.5 }} />
               </div>
             </div>
           </td>
-          <td className="px-8 py-5">
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+          <td style={{ padding: '16px 24px' }}>
+            <div style={{ ...skStyles.bar, width: '80px' }} />
           </td>
-          <td className="px-8 py-5">
-            <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" />
+          <td style={{ padding: '16px 24px' }}>
+            <div style={{ ...skStyles.bar, width: '64px', borderRadius: '20px' }} />
           </td>
-          <td className="px-8 py-5">
-            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+          <td style={{ padding: '16px 24px' }}>
+            <div style={{ ...skStyles.bar, width: '96px' }} />
           </td>
-          <td className="px-8 py-5 text-right flex justify-end">
-            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+          <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+            <div style={{ ...skStyles.bar, width: '96px', marginLeft: 'auto' }} />
           </td>
-          <td className="px-8 py-5" />
         </tr>
       ))}
     </>
@@ -35,18 +32,45 @@ export const TableSkeleton = ({ rows = 5 }) => {
 
 export const StatCardSkeleton = () => {
   return (
-    <div className="backdrop-blur-md bg-white/60 p-6 rounded-xl border border-gray-200 shadow-lg relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
-      <div className="flex items-start justify-between">
-        <div className="space-y-4 w-full">
-          <div className="w-12 h-12 bg-gray-200 rounded-2xl animate-pulse" />
-          <div className="space-y-3">
-            <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
-            <div className="h-8 w-32 bg-gray-200 rounded animate-pulse" />
-            <div className="h-3 w-40 bg-gray-100 rounded animate-pulse" />
-          </div>
+    <div style={skStyles.card}>
+      <div style={skStyles.shimmer} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ ...skStyles.circle, width: '44px', height: '44px', borderRadius: '12px' }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ ...skStyles.bar, width: '96px' }} />
+          <div style={{ ...skStyles.bar, width: '128px', height: '28px' }} />
+          <div style={{ ...skStyles.bar, width: '160px', opacity: 0.5 }} />
         </div>
       </div>
     </div>
   );
+};
+
+const skStyles = {
+  card: {
+    background: 'rgba(10,22,40,0.7)',
+    border: '1px solid rgba(56,189,248,0.12)',
+    borderRadius: '16px',
+    padding: '24px',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  shimmer: {
+    position: 'absolute', inset: 0,
+    background: 'linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.06) 50%, transparent 100%)',
+    backgroundSize: '600px 100%',
+    animation: 'shimmer 1.8s infinite',
+  },
+  bar: {
+    height: '13px',
+    background: 'rgba(56,189,248,0.1)',
+    borderRadius: '6px',
+    animation: 'pulse 1.8s ease-in-out infinite',
+  },
+  circle: {
+    width: '40px', height: '40px', borderRadius: '50%',
+    background: 'rgba(56,189,248,0.1)',
+    animation: 'pulse 1.8s ease-in-out infinite',
+    flexShrink: 0,
+  },
 };

@@ -1,14 +1,14 @@
 import { NavLink } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Receipt, 
-  BookOpen, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Users,
+  Receipt,
+  BookOpen,
+  Settings,
   LogOut,
-  Wallet,
+  Layers,
   BarChart3,
   FileText,
   ShieldAlert,
@@ -16,7 +16,7 @@ import {
   CheckCircle,
   MessageSquare,
   Menu,
-  X
+  X,
 } from 'lucide-react';
 import authService from '../services/auth';
 import useMobile from '../hooks/useMobile';
@@ -31,77 +31,134 @@ const Sidebar = () => {
     setUserRole(role);
   }, []);
 
-  // Close sidebar when route changes on mobile
   useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
+    if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
-  // Base navigation items available to specified roles
   const baseNavItems = [
-    { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Overview', roles: ['BURSAR', 'HEADMASTER'] },
+    { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Overview', roles: ['BURSAR', 'HEADMASTER'] },
   ];
 
-  // Bursar-specific items
   const bursarItems = [
-    { to: '/students', icon: <Users size={20} />, label: 'Students', roles: ['BURSAR'] },
-    { to: '/payments', icon: <Receipt size={20} />, label: 'Payments', roles: ['BURSAR'] },
-    { to: '/fees', icon: <BookOpen size={20} />, label: 'Fee Structures', roles: ['BURSAR'] },
-    { to: '/refunds', icon: <ArrowLeftRight size={20} />, label: 'Refunds', roles: ['BURSAR'] },
-    { to: '/reconciliation', icon: <CheckCircle size={20} />, label: 'Reconciliation', roles: ['BURSAR'] },
-    { to: '/sms-reminders', icon: <MessageSquare size={20} />, label: 'SMS Reminders', roles: ['BURSAR'] },
-    { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['BURSAR'] },
-    { to: '/settings', icon: <Settings size={20} />, label: 'Setup', roles: ['BURSAR'] },
+    { to: '/students',       icon: <Users size={18} />,         label: 'Students',       roles: ['BURSAR'] },
+    { to: '/payments',       icon: <Receipt size={18} />,       label: 'Payments',       roles: ['BURSAR'] },
+    { to: '/fees',           icon: <BookOpen size={18} />,      label: 'Fee Structures', roles: ['BURSAR'] },
+    { to: '/refunds',        icon: <ArrowLeftRight size={18} />,label: 'Refunds',        roles: ['BURSAR'] },
+    { to: '/reconciliation', icon: <CheckCircle size={18} />,   label: 'Reconciliation', roles: ['BURSAR'] },
+    { to: '/sms-reminders',  icon: <MessageSquare size={18} />, label: 'SMS Reminders',  roles: ['BURSAR'] },
+    { to: '/reports',        icon: <FileText size={18} />,      label: 'Reports',        roles: ['BURSAR'] },
+    { to: '/settings',       icon: <Settings size={18} />,      label: 'Setup',          roles: ['BURSAR'] },
   ];
 
-  // Headmaster-specific items
   const headmasterItems = [
-    { to: '/headmaster-dashboard', icon: <BarChart3 size={20} />, label: 'System Dashboard', roles: ['HEADMASTER'] },
-    { to: '/refunds', icon: <ArrowLeftRight size={20} />, label: 'Refunds', roles: ['HEADMASTER'] },
-    { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['HEADMASTER'] },
+    { to: '/headmaster-dashboard', icon: <BarChart3 size={18} />,      label: 'System Dashboard', roles: ['HEADMASTER'] },
+    { to: '/refunds',              icon: <ArrowLeftRight size={18} />, label: 'Refunds',           roles: ['HEADMASTER'] },
+    { to: '/reports',              icon: <FileText size={18} />,       label: 'Reports',           roles: ['HEADMASTER'] },
   ];
 
-  // Teacher-specific items
   const teacherItems = [
-    { to: '/teacher-dashboard', icon: <LayoutDashboard size={20} />, label: 'My Classes', roles: ['TEACHER'] },
+    { to: '/teacher-dashboard', icon: <LayoutDashboard size={18} />, label: 'My Classes', roles: ['TEACHER'] },
   ];
 
-  // Admin items (Headmaster only)
   const adminItems = [
-    { to: '/audit-logs', icon: <ShieldAlert size={20} />, label: 'Audit Logs', roles: ['HEADMASTER'] },
+    { to: '/audit-logs', icon: <ShieldAlert size={18} />, label: 'Audit Logs', roles: ['HEADMASTER'] },
   ];
 
-  // Filter nav items based on user role
   const allItems = [...baseNavItems, ...bursarItems, ...headmasterItems, ...teacherItems, ...adminItems];
-  const navItems = userRole 
-    ? allItems.filter(item => item.roles.includes(userRole))
-    : baseNavItems;
+  const navItems = userRole ? allItems.filter(item => item.roles.includes(userRole)) : baseNavItems;
 
-  // Get role badge styling
-  const getRoleBadgeStyle = () => {
-    const roleStyles = {
-      'BURSAR': 'bg-blue-100 text-blue-700 border-blue-200',
-      'HEADMASTER': 'bg-purple-100 text-purple-700 border-purple-200',
-      'TEACHER': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      'PARENT': 'bg-pink-100 text-pink-700 border-pink-200',
-    };
-    return roleStyles[userRole] || 'bg-gray-100 text-gray-700 border-gray-200';
+  const roleBadgeColors = {
+    BURSAR:     'rgba(14,165,233,0.15)',
+    HEADMASTER: 'rgba(139,92,246,0.15)',
+    TEACHER:    'rgba(234,179,8,0.15)',
+    PARENT:     'rgba(236,72,153,0.15)',
   };
+  const roleBadgeBorder = {
+    BURSAR:     'rgba(14,165,233,0.4)',
+    HEADMASTER: 'rgba(139,92,246,0.4)',
+    TEACHER:    'rgba(234,179,8,0.4)',
+    PARENT:     'rgba(236,72,153,0.4)',
+  };
+  const roleBadgeText = {
+    BURSAR:     '#38bdf8',
+    HEADMASTER: '#a78bfa',
+    TEACHER:    '#fde047',
+    PARENT:     '#f9a8d4',
+  };
+
+  const sidebarContent = (
+    <div style={styles.sidebar}>
+      {/* Logo */}
+      <div style={styles.logoRow}>
+        <div style={styles.logoIcon}>
+          <Layers size={22} color="#38bdf8" strokeWidth={2} />
+        </div>
+        <div>
+          <span style={styles.logoName}>BursarPro</span>
+          <span style={styles.logoSub}>Admin Portal</span>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div style={styles.divider} />
+
+      {/* Nav */}
+      <nav style={styles.nav}>
+        {navItems.map(item => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            onClick={() => isMobile && setSidebarOpen(false)}
+            style={({ isActive }) => ({
+              ...styles.navLink,
+              ...(isActive ? styles.navLinkActive : {}),
+            })}
+          >
+            <span style={{ opacity: 0.85 }}>{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User info */}
+      <div style={styles.footer}>
+        <div style={styles.userCard}>
+          <div style={styles.userAvatar}>
+            {(authService.getCurrentUser() || 'U')[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={styles.userName}>{authService.getCurrentUser() || 'Administrator'}</p>
+            {userRole && (
+              <span style={{
+                ...styles.roleBadge,
+                background: roleBadgeColors[userRole] || 'rgba(56,189,248,0.1)',
+                border: `1px solid ${roleBadgeBorder[userRole] || 'rgba(56,189,248,0.3)'}`,
+                color: roleBadgeText[userRole] || '#38bdf8',
+              }}>
+                {userRole}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <button onClick={() => authService.logout()} style={styles.signOutBtn}>
+          <LogOut size={16} />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* Mobile Menu Button */}
+      {/* Mobile hamburger */}
       {isMobile && (
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="fixed top-4 left-4 z-50 p-2 bg-white/90 backdrop-blur-md rounded-lg border border-gray-200 hover:bg-gray-100 md:hidden"
-        >
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+        <button onClick={() => setSidebarOpen(!sidebarOpen)} style={styles.hamburger}>
+          {sidebarOpen ? <X size={22} color="#38bdf8" /> : <Menu size={22} color="#38bdf8" />}
         </button>
       )}
 
-      {/* Sidebar Overlay (Mobile) */}
+      {/* Mobile overlay */}
       <AnimatePresence>
         {isMobile && sidebarOpen && (
           <motion.div
@@ -109,81 +166,132 @@ const Sidebar = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 bg-black/50 z-30 md:hidden"
+            style={styles.overlay}
           />
         )}
       </AnimatePresence>
 
       {/* Sidebar */}
       <motion.aside
-        animate={{
-          x: isMobile && !sidebarOpen ? -400 : 0,
-        }}
-        transition={{ type: 'tween', duration: 0.3 }}
-        className="w-72 bg-white/80 backdrop-blur-md border-r border-gray-200 flex flex-col h-screen sticky top-0 z-40 font-outfit md:relative md:translate-x-0
-          fixed left-0 top-0 md:w-72 md:sticky"
+        animate={{ x: isMobile && !sidebarOpen ? -300 : 0 }}
+        transition={{ type: 'tween', duration: 0.28 }}
+        style={isMobile ? styles.sidebarMobile : styles.sidebarDesktop}
       >
-      <div className="p-8 flex items-center gap-4">
-        <div className="p-3 bg-blue-100 rounded-2xl">
-          <Wallet className="text-blue-600 w-6 h-6" />
-        </div>
-        <div className="flex flex-col text-left">
-          <span className="text-2xl font-black tracking-tighter text-blue-600 leading-tight">BursarPro</span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold">Admin Portal</span>
-        </div>
-      </div>
-
-      <nav className="flex-1 px-4 py-8 space-y-3">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => `
-              flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 relative group
-              ${isActive 
-                ? 'bg-blue-50 text-blue-700 border border-blue-100 shadow-sm' 
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
-            `}
-          >
-            <div className={`transition-transform duration-300 group-hover:scale-110`}>
-              {item.icon}
-            </div>
-            <span className="font-bold tracking-tight">{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="p-6 space-y-4">
-        <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-100 blur-2xl rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="relative z-10 space-y-3">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Authenticated As</p>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold ring-2 ring-white text-blue-700">
-                {(authService.getCurrentUser() || 'U')[0].toUpperCase()}
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold truncate max-w-[120px] text-gray-800">{authService.getCurrentUser() || 'Administrator'}</p>
-              </div>
-            </div>
-            {userRole && (
-              <div className={`text-xs px-3 py-1 rounded-full font-bold border ${getRoleBadgeStyle()} text-center`}>
-                {userRole.replace(/_/g, ' ')}
-              </div>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={() => authService.logout()}
-          className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-red-600 hover:bg-red-50 transition-all font-bold group"
-        >
-          <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Sign Out</span>
-        </button>
-      </div>
+        {sidebarContent}
       </motion.aside>
     </>
   );
+};
+
+const styles = {
+  sidebarDesktop: {
+    width: '256px',
+    minWidth: '256px',
+    height: '100vh',
+    position: 'sticky',
+    top: 0,
+    zIndex: 40,
+  },
+  sidebarMobile: {
+    width: '256px',
+    height: '100vh',
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    zIndex: 50,
+  },
+  sidebar: {
+    height: '100%',
+    background: 'rgba(8,18,36,0.92)',
+    borderRight: '1px solid rgba(56,189,248,0.12)',
+    backdropFilter: 'blur(24px)',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: "'Inter', 'Outfit', sans-serif",
+    boxShadow: '4px 0 30px rgba(0,0,0,0.4)',
+  },
+  logoRow: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '24px 20px 18px',
+  },
+  logoIcon: {
+    width: '42px', height: '42px', borderRadius: '12px',
+    background: 'linear-gradient(135deg, #0c2d4a, #0e3a5c)',
+    border: '1px solid rgba(56,189,248,0.35)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 0 16px rgba(56,189,248,0.2)',
+    flexShrink: 0,
+  },
+  logoName: {
+    display: 'block', fontSize: '17px', fontWeight: '800',
+    color: '#f0f9ff', letterSpacing: '0.3px', lineHeight: 1.2,
+  },
+  logoSub: {
+    display: 'block', fontSize: '9px', fontWeight: '700',
+    color: '#38bdf8', letterSpacing: '2px', textTransform: 'uppercase', opacity: 0.8,
+  },
+  divider: {
+    height: '1px', background: 'rgba(56,189,248,0.1)', margin: '0 16px 12px',
+  },
+  nav: {
+    flex: 1, padding: '4px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px',
+  },
+  navLink: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '10px 14px', borderRadius: '10px',
+    color: '#94a3b8', fontWeight: '600', fontSize: '13.5px',
+    textDecoration: 'none', transition: 'all 0.18s',
+    border: '1px solid transparent',
+  },
+  navLinkActive: {
+    background: 'rgba(56,189,248,0.12)',
+    border: '1px solid rgba(56,189,248,0.3)',
+    color: '#38bdf8',
+    boxShadow: '0 0 12px rgba(56,189,248,0.1)',
+  },
+  footer: {
+    padding: '12px 14px 16px',
+    borderTop: '1px solid rgba(56,189,248,0.1)',
+  },
+  userCard: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    background: 'rgba(56,189,248,0.05)',
+    border: '1px solid rgba(56,189,248,0.1)',
+    borderRadius: '12px', padding: '10px 12px', marginBottom: '10px',
+  },
+  userAvatar: {
+    width: '34px', height: '34px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, #0c2d4a, #0ea5e9)',
+    border: '1px solid rgba(56,189,248,0.4)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '13px', fontWeight: '800', color: '#f0f9ff', flexShrink: 0,
+  },
+  userName: {
+    fontSize: '13px', fontWeight: '700', color: '#e2e8f0',
+    margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    maxWidth: '130px',
+  },
+  roleBadge: {
+    display: 'inline-block', fontSize: '10px', fontWeight: '700',
+    padding: '2px 8px', borderRadius: '20px', letterSpacing: '0.5px',
+  },
+  signOutBtn: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+    padding: '10px 14px', borderRadius: '10px',
+    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+    color: '#fca5a5', fontWeight: '600', fontSize: '13px',
+    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s',
+  },
+  hamburger: {
+    position: 'fixed', top: '14px', left: '14px', zIndex: 60,
+    width: '40px', height: '40px', borderRadius: '10px',
+    background: 'rgba(8,18,36,0.9)', border: '1px solid rgba(56,189,248,0.25)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', backdropFilter: 'blur(12px)',
+  },
+  overlay: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 45,
+  },
 };
 
 export default Sidebar;

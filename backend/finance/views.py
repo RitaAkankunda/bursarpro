@@ -157,19 +157,22 @@ class ClassLevelViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        # Verify the school belongs to the current user
-        school_id = serializer.validated_data.get('school').id
+        # Automatically set school from the bursar's created schools
         user_role = UserRole.objects.filter(user=self.request.user).first()
         
-        # Check if user is BURSAR or has permission for this school
-        if user_role and user_role.role == 'BURSAR':
-            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-            if school_id not in user_schools:
+        # Try to get school from user_role first, then from created_by
+        if user_role and user_role.school:
+            school = user_role.school
+        else:
+            # If BURSAR, get their first created school
+            school = School.objects.filter(created_by=self.request.user).first()
+            if not school:
                 return Response(
-                    {'error': 'You do not have permission to add classes to this school'},
-                    status=status.HTTP_403_FORBIDDEN
+                    {'error': 'No school found. Please create a school first.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-        serializer.save()
+        
+        serializer.save(school=school)
 
 
 class TermViewSet(viewsets.ModelViewSet):
@@ -193,19 +196,22 @@ class TermViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        # Verify the school belongs to the current user
-        school_id = serializer.validated_data.get('school').id
+        # Automatically set school from the bursar's created schools
         user_role = UserRole.objects.filter(user=self.request.user).first()
         
-        # Check if user is BURSAR or has permission for this school
-        if user_role and user_role.role == 'BURSAR':
-            user_schools = School.objects.filter(created_by=self.request.user).values_list('id', flat=True)
-            if school_id not in user_schools:
+        # Try to get school from user_role first, then from created_by
+        if user_role and user_role.school:
+            school = user_role.school
+        else:
+            # If BURSAR, get their first created school
+            school = School.objects.filter(created_by=self.request.user).first()
+            if not school:
                 return Response(
-                    {'error': 'You do not have permission to add terms to this school'},
-                    status=status.HTTP_403_FORBIDDEN
+                    {'error': 'No school found. Please create a school first.'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-        serializer.save()
+        
+        serializer.save(school=school)
 
 
 class FeeStructureViewSet(viewsets.ModelViewSet):
