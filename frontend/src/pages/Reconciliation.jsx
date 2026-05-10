@@ -1,48 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, AlertCircle, CheckCircle, Clock, Download, Filter } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
+import DashboardLayout from '../components/DashboardLayout';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = `${API_URL}/api/v1`;
 
 const Reconciliation = () => {
   const [activeTab, setActiveTab] = useState('statements');
   const [bankStatements, setBankStatements] = useState([]);
   const [reconciliations, setReconciliations] = useState([]);
   const [discrepancies, setDiscrepancies] = useState([]);
-  
+
   const [uploadingStatement, setUploadingStatement] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
-  
+
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [selectedReconciliation, setSelectedReconciliation] = useState(null);
-  
+
   const statementStatuses = [
-    { value: 'PENDING', label: 'Pending Review', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'PROCESSING', label: 'Processing', color: 'bg-blue-100 text-blue-800' },
-    { value: 'RECONCILED', label: 'Fully Reconciled', color: 'bg-green-100 text-green-800' },
-    { value: 'PARTIAL', label: 'Partially Reconciled', color: 'bg-orange-100 text-orange-800' },
-    { value: 'FAILED', label: 'Failed', color: 'bg-red-100 text-red-800' },
+    { value: 'PENDING', label: 'Pending Review', color: 'bg-yellow-500/10 text-yellow-500' },
+    { value: 'PROCESSING', label: 'Processing', color: 'bg-blue-500/10 text-blue-500' },
+    { value: 'RECONCILED', label: 'Fully Reconciled', color: 'bg-emerald-500/10 text-emerald-500' },
+    { value: 'PARTIAL', label: 'Partially Reconciled', color: 'bg-orange-500/10 text-orange-500' },
+    { value: 'FAILED', label: 'Failed', color: 'bg-red-500/10 text-red-500' },
   ];
 
   const severityLevels = [
-    { value: 'CRITICAL', label: 'Critical', color: 'bg-red-100 text-red-800' },
-    { value: 'HIGH', label: 'High', color: 'bg-orange-100 text-orange-800' },
-    { value: 'MEDIUM', label: 'Medium', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'LOW', label: 'Low', color: 'bg-green-100 text-green-800' },
+    { value: 'CRITICAL', label: 'Critical', color: 'bg-red-500/10 text-red-500' },
+    { value: 'HIGH', label: 'High', color: 'bg-orange-500/10 text-orange-500' },
+    { value: 'MEDIUM', label: 'Medium', color: 'bg-yellow-500/10 text-yellow-500' },
+    { value: 'LOW', label: 'Low', color: 'bg-emerald-500/10 text-emerald-500' },
   ];
 
-  // Fetch bank statements
   useEffect(() => {
     const fetchStatements = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const response = await axios.get(
-          `${API_URL}/api/finance/bank-statements/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const response = await axios.get(`${API_BASE}/bank-statements/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setBankStatements(response.data.results || response.data);
       } catch (error) {
         console.error('Error fetching statements:', error);
@@ -55,19 +56,18 @@ const Reconciliation = () => {
     }
   }, [activeTab]);
 
-  // Fetch reconciliations
   useEffect(() => {
     const fetchReconciliations = async () => {
       try {
         const token = localStorage.getItem('access_token');
-        const url = filterStatus === 'unmatched' 
-          ? `${API_URL}/api/finance/payment-reconciliations/unmatched/`
+        const url = filterStatus === 'unmatched'
+          ? `${API_BASE}/payment-reconciliations/unmatched/`
           : filterStatus === 'disputed'
-          ? `${API_URL}/api/finance/payment-reconciliations/disputed/`
-          : `${API_URL}/api/finance/payment-reconciliations/`;
-        
+            ? `${API_BASE}/payment-reconciliations/disputed/`
+            : `${API_BASE}/payment-reconciliations/`;
+
         const response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         setReconciliations(response.data.results || response.data);
       } catch (error) {
@@ -81,17 +81,16 @@ const Reconciliation = () => {
     }
   }, [activeTab, filterStatus]);
 
-  // Fetch discrepancies
   useEffect(() => {
     const fetchDiscrepancies = async () => {
       try {
         const token = localStorage.getItem('access_token');
         const url = filterSeverity === 'all'
-          ? `${API_URL}/api/finance/reconciliation-discrepancies/unresolved/`
-          : `${API_URL}/api/finance/reconciliation-discrepancies/by_severity/?severity=${filterSeverity}`;
-        
+          ? `${API_BASE}/reconciliation-discrepancies/unresolved/`
+          : `${API_BASE}/reconciliation-discrepancies/by_severity/?severity=${filterSeverity}`;
+
         const response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         setDiscrepancies(response.data.results || response.data);
       } catch (error) {
@@ -121,16 +120,12 @@ const Reconciliation = () => {
       formData.append('file_name', file.name);
 
       const token = localStorage.getItem('access_token');
-      const response = await axios.post(
-        `${API_URL}/api/finance/bank-statements/`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await axios.post(`${API_BASE}/bank-statements/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       setBankStatements([response.data, ...bankStatements]);
       setShowStatementModal(false);
@@ -146,15 +141,10 @@ const Reconciliation = () => {
   const processStatement = async (statementId) => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post(
-        `${API_URL}/api/finance/bank-statements/${statementId}/process/`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setBankStatements(
-        bankStatements.map(s => s.id === statementId ? response.data : s)
-      );
+      const response = await axios.post(`${API_BASE}/bank-statements/${statementId}/process/`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBankStatements(bankStatements.map((s) => (s.id === statementId ? response.data : s)));
       toast.success('Statement processing started');
     } catch (error) {
       console.error('Error processing statement:', error);
@@ -165,15 +155,13 @@ const Reconciliation = () => {
   const handleMatchPayment = async (reconciliationId, paymentId, confidence) => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post(
-        `${API_URL}/api/finance/payment-reconciliations/${reconciliationId}/match_payment/`,
-        { payment_id: paymentId, confidence_score: confidence },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setReconciliations(
-        reconciliations.map(r => r.id === reconciliationId ? response.data : r)
-      );
+      const response = await axios.post(`${API_BASE}/payment-reconciliations/${reconciliationId}/match_payment/`, {
+        payment_id: paymentId,
+        confidence_score: confidence,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setReconciliations(reconciliations.map((r) => (r.id === reconciliationId ? response.data : r)));
       setShowMatchModal(false);
       setSelectedReconciliation(null);
       toast.success('Payment matched successfully');
@@ -186,15 +174,12 @@ const Reconciliation = () => {
   const resolveDiscrepancy = async (discrepancyId, notes) => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post(
-        `${API_URL}/api/finance/reconciliation-discrepancies/${discrepancyId}/resolve/`,
-        { resolution_notes: notes },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setDiscrepancies(
-        discrepancies.map(d => d.id === discrepancyId ? response.data : d)
-      );
+      const response = await axios.post(`${API_BASE}/reconciliation-discrepancies/${discrepancyId}/resolve/`, {
+        resolution_notes: notes,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDiscrepancies(discrepancies.map((d) => (d.id === discrepancyId ? response.data : d)));
       toast.success('Discrepancy resolved');
     } catch (error) {
       console.error('Error resolving discrepancy:', error);
@@ -202,14 +187,13 @@ const Reconciliation = () => {
     }
   };
 
-  // Bank Statements Tab
   const renderStatementsTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Bank Statements</h2>
+        <h2 className="text-2xl font-bold text-white">Bank Statements</h2>
         <button
           onClick={() => setShowStatementModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 transition"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 transition font-bold"
         >
           <Upload size={20} />
           Upload Statement
@@ -217,35 +201,34 @@ const Reconciliation = () => {
       </div>
 
       {bankStatements.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Upload size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600">No bank statements uploaded yet</p>
+        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+          <Upload size={48} className="mx-auto text-gray-500 mb-4" />
+          <p className="text-gray-400">No bank statements uploaded yet</p>
         </div>
       ) : (
         <div className="grid gap-4">
           {bankStatements.map((statement) => {
-            const statusObj = statementStatuses.find(s => s.value === statement.status);
+            const statusObj = statementStatuses.find((s) => s.value === statement.status);
             return (
-              <div key={statement.id} className="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-md transition">
+              <div key={statement.id} className="backdrop-blur-md bg-white/5 p-4 rounded-xl shadow border border-white/10 hover:bg-white/10 transition">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{statement.file_name}</h3>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusObj?.color}`}>
+                      <h3 className="font-semibold text-white">{statement.file_name}</h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusObj?.color}`}>
                         {statusObj?.label}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                      <p><span className="font-medium">Date:</span> {new Date(statement.statement_date).toLocaleDateString()}</p>
-                      <p><span className="font-medium">Amount:</span> UGX {(statement.total_amount || 0).toLocaleString()}</p>
-                      <p><span className="font-medium">Transactions:</span> {statement.transaction_count}</p>
-                      <p><span className="font-medium">Uploaded:</span> {new Date(statement.uploaded_at).toLocaleDateString()}</p>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-400">
+                      <p><span className="text-gray-500 font-medium">Date:</span> {new Date(statement.statement_date).toLocaleDateString()}</p>
+                      <p><span className="text-gray-500 font-medium">Amount:</span> UGX {(statement.total_amount || 0).toLocaleString()}</p>
+                      <p><span className="text-gray-500 font-medium">Transactions:</span> {statement.transaction_count}</p>
                     </div>
                   </div>
                   {statement.status === 'PENDING' && (
                     <button
                       onClick={() => processStatement(statement.id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition ml-4"
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition ml-4 font-bold text-sm"
                     >
                       Process
                     </button>
@@ -259,50 +242,46 @@ const Reconciliation = () => {
     </div>
   );
 
-  // Reconciliations Tab
   const renderReconciliationsTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Payment Reconciliations</h2>
-        <div className="flex gap-2">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value="unmatched">Unmatched</option>
-            <option value="disputed">Disputed</option>
-          </select>
-        </div>
+        <h2 className="text-2xl font-bold text-white">Payment Reconciliations</h2>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Statuses</option>
+          <option value="unmatched">Unmatched</option>
+          <option value="disputed">Disputed</option>
+        </select>
       </div>
 
       {reconciliations.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <Clock size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600">No reconciliation records found</p>
+        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+          <Clock size={48} className="mx-auto text-gray-500 mb-4" />
+          <p className="text-gray-400">No reconciliation records found</p>
         </div>
       ) : (
         <div className="grid gap-4">
           {reconciliations.map((reconciliation) => (
-            <div key={reconciliation.id} className="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-md transition">
+            <div key={reconciliation.id} className="backdrop-blur-md bg-white/5 p-4 rounded-xl shadow border border-white/10 hover:bg-white/10 transition">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-gray-900">{reconciliation.bank_transaction_id}</h3>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      reconciliation.status === 'MATCHED' ? 'bg-green-100 text-green-800' :
-                      reconciliation.status === 'UNMATCHED' ? 'bg-yellow-100 text-yellow-800' :
-                      reconciliation.status === 'MANUAL_MATCHED' ? 'bg-blue-100 text-blue-800' :
-                      'bg-red-100 text-red-800'
+                    <h3 className="font-semibold text-white">{reconciliation.bank_transaction_id}</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      reconciliation.status === 'MATCHED' ? 'bg-emerald-500/10 text-emerald-500' :
+                      reconciliation.status === 'UNMATCHED' ? 'bg-yellow-500/10 text-yellow-500' :
+                      reconciliation.status === 'MANUAL_MATCHED' ? 'bg-blue-500/10 text-blue-500' :
+                      'bg-red-500/10 text-red-500'
                     }`}>
-                      {reconciliation.status_display}
+                      {reconciliation.status}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
-                    <p><span className="font-medium">Amount:</span> UGX {(reconciliation.bank_amount || 0).toLocaleString()}</p>
-                    <p><span className="font-medium">Date:</span> {new Date(reconciliation.bank_date).toLocaleDateString()}</p>
-                    <p><span className="font-medium">Confidence:</span> {Math.round(reconciliation.confidence_score)}%</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-gray-400">
+                    <p><span className="text-gray-500 font-medium">Bank Date:</span> {reconciliation.bank_date}</p>
+                    <p><span className="text-gray-500 font-medium">Amount:</span> UGX {(reconciliation.bank_amount || 0).toLocaleString()}</p>
                   </div>
                 </div>
                 {reconciliation.status === 'UNMATCHED' && (
@@ -311,20 +290,12 @@ const Reconciliation = () => {
                       setSelectedReconciliation(reconciliation);
                       setShowMatchModal(true);
                     }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition ml-4"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-bold text-sm"
                   >
-                    Match
+                    Match Manual
                   </button>
                 )}
               </div>
-              {reconciliation.amount_difference > 0 && (
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded flex items-center gap-2">
-                  <AlertCircle size={18} className="text-yellow-600" />
-                  <span className="text-sm text-yellow-800">
-                    Amount difference: UGX {reconciliation.amount_difference.toLocaleString()}
-                  </span>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -332,66 +303,51 @@ const Reconciliation = () => {
     </div>
   );
 
-  // Discrepancies Tab
   const renderDiscrepanciesTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Discrepancies</h2>
-        <div className="flex gap-2">
-          <select
-            value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Severities</option>
-            {severityLevels.map(level => (
-              <option key={level.value} value={level.value}>{level.label}</option>
-            ))}
-          </select>
-        </div>
+        <h2 className="text-2xl font-bold text-white">Discrepancies</h2>
+        <select
+          value={filterSeverity}
+          onChange={(e) => setFilterSeverity(e.target.value)}
+          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">All Severities</option>
+          {severityLevels.map((level) => (
+            <option key={level.value} value={level.value}>{level.label}</option>
+          ))}
+        </select>
       </div>
 
       {discrepancies.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <CheckCircle size={48} className="mx-auto text-green-400 mb-4" />
-          <p className="text-gray-600">No unresolved discrepancies found</p>
+        <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/10">
+          <CheckCircle size={48} className="mx-auto text-emerald-500/50 mb-4" />
+          <p className="text-gray-400">No unresolved discrepancies found</p>
         </div>
       ) : (
         <div className="grid gap-4">
           {discrepancies.map((discrepancy) => {
-            const severityObj = severityLevels.find(s => s.value === discrepancy.severity);
+            const severityObj = severityLevels.find((s) => s.value === discrepancy.severity);
             return (
-              <div key={discrepancy.id} className="bg-white p-4 rounded-lg shadow border-l-4 border-l-red-500">
+              <div key={discrepancy.id} className="backdrop-blur-md bg-white/5 p-4 rounded-xl shadow border-l-4 border-l-red-500 border-white/10">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{discrepancy.discrepancy_type_display}</h3>
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${severityObj?.color}`}>
+                      <h3 className="font-semibold text-white">{discrepancy.discrepancy_type_display}</h3>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${severityObj?.color}`}>
                         {severityObj?.label}
                       </span>
-                      {discrepancy.is_resolved && (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                          Resolved
-                        </span>
-                      )}
                     </div>
-                    <p className="text-gray-600 mb-2">{discrepancy.description}</p>
-                    {discrepancy.suggested_action && (
-                      <p className="text-sm text-blue-600 bg-blue-50 p-2 rounded mb-2">
-                        <span className="font-medium">Suggested Action:</span> {discrepancy.suggested_action}
-                      </p>
-                    )}
+                    <p className="text-gray-400 mb-2">{discrepancy.description}</p>
                   </div>
                 </div>
                 {!discrepancy.is_resolved && (
                   <button
                     onClick={() => {
                       const notes = prompt('Enter resolution notes:');
-                      if (notes) {
-                        resolveDiscrepancy(discrepancy.id, notes);
-                      }
+                      if (notes) resolveDiscrepancy(discrepancy.id, notes);
                     }}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition text-sm font-bold"
                   >
                     Mark as Resolved
                   </button>
@@ -405,30 +361,34 @@ const Reconciliation = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Payment Reconciliation</h1>
-          <p className="text-gray-600">Manage bank statement uploads and reconcile with recorded payments</p>
+    <DashboardLayout>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-7xl mx-auto space-y-8"
+      >
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-4xl font-black text-white tracking-tight">Payment Reconciliation</h1>
+            <p className="text-gray-400 mt-2 font-medium">Manage bank statement uploads and reconcile with recorded payments</p>
+          </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-t-xl shadow-md border-b border-gray-200 flex">
+        <div className="bg-white/5 backdrop-blur-md rounded-2xl p-1.5 flex gap-1 border border-white/10">
           {[
             { id: 'statements', label: 'Bank Statements', icon: Upload },
             { id: 'reconciliations', label: 'Reconciliations', icon: Clock },
             { id: 'discrepancies', label: 'Discrepancies', icon: AlertCircle },
-          ].map(tab => {
+          ].map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-4 px-6 font-medium flex items-center justify-center gap-2 transition border-b-2 ${
+                className={`flex-1 py-3 px-6 rounded-xl font-bold flex items-center justify-center gap-2 transition-all duration-300 ${
                   activeTab === tab.id
-                    ? 'text-blue-600 border-blue-600 bg-blue-50'
-                    : 'text-gray-600 border-transparent hover:text-gray-900'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <Icon size={20} />
@@ -438,102 +398,96 @@ const Reconciliation = () => {
           })}
         </div>
 
-        {/* Tab Content */}
-        <div className="bg-white rounded-b-xl shadow-md p-6">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="backdrop-blur-md bg-white/5 rounded-3xl p-8 border border-white/10 shadow-2xl"
+        >
           {activeTab === 'statements' && renderStatementsTab()}
           {activeTab === 'reconciliations' && renderReconciliationsTab()}
           {activeTab === 'discrepancies' && renderDiscrepanciesTab()}
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Upload Statement Modal */}
-      {showStatementModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Upload Bank Statement</h2>
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  handleStatementUpload(e.target.files[0]);
-                }
-              }}
-              disabled={uploadingStatement}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            />
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setShowStatementModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+      <AnimatePresence>
+        {showStatementModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-3xl p-8 max-w-md w-full"
+            >
+              <h2 className="text-2xl font-bold text-white mb-6">Upload Bank Statement</h2>
+              <input
+                type="file"
+                onChange={(e) => e.target.files?.[0] && handleStatementUpload(e.target.files[0])}
                 disabled={uploadingStatement}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowStatementModal(false)}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
-                disabled={uploadingStatement}
-              >
-                {uploadingStatement ? 'Uploading...' : 'Upload'}
-              </button>
-            </div>
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white mb-6"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowStatementModal(false)}
+                  className="flex-1 px-6 py-3 border border-white/10 text-gray-400 rounded-xl hover:bg-white/5 transition"
+                >Cancel</button>
+                <button
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition disabled:opacity-50"
+                  disabled={uploadingStatement}
+                >{uploadingStatement ? 'Uploading...' : 'Upload'}</button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* Match Payment Modal */}
-      {showMatchModal && selectedReconciliation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Match Payment</h2>
-            <p className="text-gray-600 mb-4">
-              Transaction: {selectedReconciliation.bank_transaction_id}
-            </p>
-            <p className="text-gray-600 mb-4">
-              Amount: UGX {(selectedReconciliation.bank_amount || 0).toLocaleString()}
-            </p>
-            <input
-              type="number"
-              placeholder="Payment ID"
-              id="paymentId"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
-            />
-            <input
-              type="number"
-              placeholder="Confidence Score (0-100)"
-              id="confidence"
-              min="0"
-              max="100"
-              defaultValue="100"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowMatchModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const paymentId = document.getElementById('paymentId').value;
-                  const confidence = parseInt(document.getElementById('confidence').value);
-                  if (paymentId && confidence >= 0 && confidence <= 100) {
-                    handleMatchPayment(selectedReconciliation.id, paymentId, confidence);
-                  } else {
-                    toast.error('Please enter valid payment ID and confidence score');
-                  }
-                }}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                Match
-              </button>
-            </div>
+      <AnimatePresence>
+        {showMatchModal && selectedReconciliation && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-3xl p-8 max-w-md w-full"
+            >
+              <h2 className="text-2xl font-bold text-white mb-4">Manual Match</h2>
+              <div className="space-y-4 mb-6">
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                  <p className="text-sm text-gray-500 mb-1">Transaction ID</p>
+                  <p className="font-mono text-white text-sm">{selectedReconciliation.bank_transaction_id}</p>
+                </div>
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                  <p className="text-sm text-gray-500 mb-1">Amount</p>
+                  <p className="text-xl font-bold text-white">UGX {(selectedReconciliation.bank_amount || 0).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <input
+                  type="number"
+                  placeholder="Enter Payment ID"
+                  id="paymentId"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowMatchModal(false)}
+                    className="flex-1 px-4 py-2 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 transition"
+                  >Cancel</button>
+                  <button
+                    onClick={() => {
+                      const paymentId = document.getElementById('paymentId').value;
+                      if (paymentId) handleMatchPayment(selectedReconciliation.id, paymentId, 100);
+                      else toast.error('Payment ID required');
+                    }}
+                    className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-bold"
+                  >Match</button>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </AnimatePresence>
+    </DashboardLayout>
   );
 };
 
