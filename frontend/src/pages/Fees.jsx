@@ -24,6 +24,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import BulkImportModal from '../components/BulkImportModal';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import CreateFeeModal from '../features/finance/presentation/CreateFeeModal';
 
 const FeeCard = ({ fee, delay, onEdit, onDelete, isEditing, editedAmount, onAmountChange, onSave, onCancel }) => (
   <motion.div 
@@ -120,6 +121,8 @@ const Fees = () => {
   const [editedAmount, setEditedAmount] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showCreateFee, setShowCreateFee] = useState(false);
+  const [classLevels, setClassLevels] = useState([]);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -134,7 +137,8 @@ const Fees = () => {
 
   const fetchInitialData = async () => {
     try {
-      const res = await api.get('/terms/');
+      const [res, classRes] = await Promise.all([api.get('/terms/'), api.get('/class-levels/')]);
+      setClassLevels(Array.isArray(classRes.data) ? classRes.data : classRes.data?.results || []);
       setTerms(res.data);
       if (res.data.length > 0) {
         setSelectedTerm(res.data[0].id);
@@ -157,6 +161,17 @@ const Fees = () => {
       setLoading(false);
     }
   };
+
+  const createFeeMutation = useMutation({
+    mutationFn: (payload) => api.post('/fee-structures/', payload),
+    onSuccess: async () => {
+      toast.success('Fee structure created');
+      setShowCreateFee(false);
+      await fetchFeeStructures();
+      queryClient.invalidateQueries({ queryKey: ['feeStructures'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    }
+  });
 
   // Update fee mutation
   const updateFeeMutation = useMutation({
@@ -234,7 +249,9 @@ const Fees = () => {
             <motion.button 
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-2xl transition-all shadow-2xl active:scale-95 whitespace-nowrap"
+              type="button"
+              onClick={() => setShowCreateFee(true)}
+              className="flex items-center gap-3 px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-2xl transition-all shadow-lg active:scale-95 whitespace-nowrap"
             >
               <Plus size={20} />
               Define New Fee
@@ -291,6 +308,26 @@ const Fees = () => {
             ))
           )}
         </div>
+
+        <CreateFeeModal
+          open={showCreateFee}
+          onClose={() => setShowCreateFee(false)}
+          terms={terms}
+          classes={classLevels}
+          selectedTerm={selectedTerm}
+          saving={createFeeMutation.isPending}
+          onSave={async (payload) => {
+            try {
+              await createFeeMutation.mutateAsync(payload);
+            } catch (error) {
+              const body = error.response?.data;
+              const message = typeof body?.detail === 'string' ? body.detail
+                : typeof body === 'object' && body !== null ? Object.entries(body).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`).join(' | ')
+                : 'Unable to save fee structure. Please try again.';
+              throw new Error(message);
+            }
+          }}
+        />
 
         {/* Delete Confirmation Modal */}
         <AnimatePresence>

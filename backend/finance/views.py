@@ -239,7 +239,7 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         if term_id:
             qs = qs.filter(term_id=term_id)
         if class_level_id:
-            qs = qs.filter(student__class_level_id=class_level_id)
+            qs = qs.filter(class_level_id=class_level_id)
         
         # Use search service for advanced filtering
         if user_role and user_role.school:
@@ -513,50 +513,56 @@ class DashboardViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
+        """Term-specific financial summary, scoped to the authenticated school."""
+        from decimal import Decimal
+
+        user_role = UserRole.objects.select_related('school').filter(user=request.user).first()
+        if not user_role or not user_role.school_id:
+            return Response({'error': 'School membership is required.'}, status=status.HTTP_403_FORBIDDEN)
+        if user_role.role not in ('BURSAR', 'HEADMASTER'):
+            return Response({'error': 'Not authorized to view school-wide finances.'}, status=status.HTTP_403_FORBIDDEN)
+
         term_id = request.query_params.get('term_id')
-        school_id = request.query_params.get('school_id')
-
         if not term_id:
-            return Response(
-                {'error': 'term_id query parameter is required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'term_id query parameter is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Base querysets filtered by school if provided
-        student_qs = Student.objects.all()
-        payment_qs = Payment.objects.filter(term_id=term_id)
-        fee_qs = FeeStructure.objects.filter(term_id=term_id)
+        # Ignore client-supplied school scope for authorization. A cross-school
+        # term must not reveal student, fee, or payment information.
+        term = Term.objects.filter(id=term_id, school_id=user_role.school_id).first()
+        if term is None:
+            return Response({'error': 'Term not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if school_id:
-            student_qs = student_qs.filter(school_id=school_id)
-            payment_qs = payment_qs.filter(student__school_id=school_id)
-            fee_qs = fee_qs.filter(term__school_id=school_id)
-
+        student_qs = Student.objects.filter(school_id=user_role.school_id)
+        payment_qs = Payment.objects.filter(term=term, student__school_id=user_role.school_id)
+        fee_qs = FeeStructure.objects.filter(term=term, class_level__school_id=user_role.school_id)
         total_students = student_qs.count()
-        total_collected = payment_qs.aggregate(total=Sum('amount'))['total'] or 0
+        total_collected = payment_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
-        # Total expected = sum of fee_structure amounts * number of students per class
-        total_expected = 0
+        # Compute with Decimal to avoid binary floating-point inaccuracies.
+        total_expected = Decimal('0')
         for fee in fee_qs:
             count = student_qs.filter(class_level=fee.class_level).count()
-            total_expected += float(fee.amount) * count
+            total_expected += fee.amount * count
 
-        total_outstanding = total_expected - float(total_collected)
-
-        # Students who have made at least one payment this term
-        paid_students = payment_qs.values('student').distinct().count()
+        paid_students = payment_qs.values('student_id').distinct().count()
+        total_outstanding = total_expected - total_collected
+        average_paid = (total_collected / paid_students) if paid_students else Decimal('0')
+        collection_rate = (total_collected / total_expected * 100) if total_expected > 0 else Decimal('0')
 
         return Response({
-            'term_id': term_id,
+            'term_id': term.id,
+            'term': term.name,
+            'school_name': user_role.school.name,
             'total_students': total_students,
+            'students_paid': paid_students,
+            'students_unpaid': max(0, total_students - paid_students),
             'students_with_payments': paid_students,
-            'students_without_payments': total_students - paid_students,
+            'students_without_payments': max(0, total_students - paid_students),
             'total_expected': round(total_expected, 2),
-            'total_collected': round(float(total_collected), 2),
+            'total_collected': round(total_collected, 2),
             'total_outstanding': round(total_outstanding, 2),
-            'collection_rate_percent': round(
-                (float(total_collected) / total_expected * 100) if total_expected > 0 else 0, 1
-            ),
+            'average_payment_per_student': round(average_paid, 2),
+            'collection_rate_percent': round(collection_rate, 1),
         })
 
     @action(detail=False, methods=['post'])

@@ -22,41 +22,9 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import DashboardCustomizer from '../components/DashboardCustomizer';
 import toast from 'react-hot-toast';
+import BursarStatCard from '../features/finance/presentation/BursarStatCard';
+import '../design-system/bursar-theme.css';
 
-const StatCard = ({ title, value, icon: Icon, color, subtitle, delay, trend }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5, delay }}
-    className="backdrop-blur-md bg-white/60 p-6 rounded-xl border border-white/30 shadow-lg relative overflow-hidden group hover:border-primary/50 transition-all"
-  >
-    <div className="flex items-start justify-between">
-      <div className="space-y-4 flex-1">
-        <div className={`p-3 ${color} rounded-2xl w-fit`}>
-          <Icon className="text-white" size={24} />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-black mt-1 text-gray-800">
-              {typeof value === 'number' ? `UGX ${value.toLocaleString()}` : value}
-            </h3>
-            {trend && (
-              <div className={`flex items-center gap-1 text-sm font-bold ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {trend > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                {Math.abs(trend)}%
-              </div>
-            )}
-          </div>
-          {subtitle && <p className="text-xs text-gray-600 mt-2 font-medium">{subtitle}</p>}
-        </div>
-      </div>
-      <div className="text-gray-400 opacity-20 group-hover:opacity-100 transition-opacity">
-        <ArrowUpRight size={24} />
-      </div>
-    </div>
-  </motion.div>
-);
 
 const PaymentMethodCard = ({ method, data, delay }) => (
   <motion.div 
@@ -289,29 +257,28 @@ const BursarDashboard = () => {
         <div className="space-y-8">
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard 
+            <BursarStatCard 
               title="Total Fees" 
               value={summary.total_fees} 
               icon={DollarSign}
               color="bg-green-500/20 text-green-600"
               delay={0}
             />
-            <StatCard 
+            <BursarStatCard 
               title="Amount Collected" 
               value={summary.total_paid} 
               icon={CheckCircle2}
               color="bg-blue-500/20 text-blue-600"
               delay={0.1}
-              trend={15}
             />
-            <StatCard 
+            <BursarStatCard 
               title="Outstanding" 
               value={summary.total_outstanding} 
               icon={AlertTriangle}
               color="bg-red-500/20 text-red-600"
               delay={0.2}
             />
-            <StatCard 
+            <BursarStatCard 
               title="Collection Rate" 
               value={summary.collection_rate ? `${summary.collection_rate}%` : '0%'}
               icon={Target}

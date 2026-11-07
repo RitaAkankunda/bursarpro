@@ -1,0 +1,28 @@
+/* BursarPro B2 · emerald/ivory dashboard onboarding. Scoped to new elements. */
+.bp-onboarding { max-width: 1240px; margin: 10px auto 60px; font-family: Inter, Outfit, system-ui, sans-serif; }
+.bp-onboarding-kicker { display:inline-flex; align-items:center; gap:9px; padding:9px 14px; border:1px solid #d6e8d8; border-radius:999px; background:#fff; color:#31744d; font-size:11px; font-weight:800; letter-spacing:.11em; margin:12px 0 22px; }
+.bp-pulse {width:8px;height:8px;border-radius:50%;background:#2eac70;box-shadow:0 0 0 4px #e3f4e8}
+.bp-onboarding-hero {display:grid;grid-template-columns:minmax(0,1.25fr) minmax(240px,.75fr);overflow:hidden;min-height:400px;background:#fff;border:1px solid #e1e9df;border-radius:28px;box-shadow:0 18px 45px rgba(27,64,40,.07)}
+.bp-onboarding-copy {padding:clamp(30px,5vw,66px)}
+.bp-step-label {display:block;color:#19844f;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:20px}
+.bp-onboarding-copy h1 {font-size:clamp(32px,3.8vw,55px);line-height:1.1;letter-spacing:-.045em;font-weight:800;color:#152e20;max-width:650px;margin:0 0 20px}
+.bp-onboarding-copy h1 em {font-style:normal;color:#178453}
+.bp-onboarding-copy>p:not(.bp-onboarding-note){color:#66776a;max-width:570px;font-size:15px;line-height:1.85;margin:0 0 26px}
+.bp-primary-action {display:inline-flex;align-items:center;justify-content:center;gap:15px;padding:15px 22px;background:linear-gradient(105deg,#147548,#219962);border:0;border-radius:14px;color:white;font-weight:750;font-size:14px;box-shadow:0 10px 25px rgba(20,117,72,.18);cursor:pointer;transition:transform .2s,box-shadow .2s}
+.bp-primary-action:hover{transform:translateY(-2px);box-shadow:0 14px 28px rgba(20,117,72,.23)}.bp-primary-action:focus-visible{outline:3px solid #85cca7;outline-offset:3px}
+.bp-onboarding-note{margin:15px 0 0;color:#8a9a8d;font-size:12px}
+.bp-onboarding-art{position:relative;min-height:310px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 44%,#eaf7e8,#f3f8ee 55%,#e9f2e6 100%);overflow:hidden}
+.bp-art-orbit{position:absolute;border:1px solid #cce5d2;border-radius:50%;width:300px;height:300px}.bp-art-orbit-two{width:440px;height:440px}
+.bp-art-card{position:relative;width:204px;padding:25px;background:white;border:1px solid #d6e8db;border-radius:22px;box-shadow:0 23px 40px #185b3524;transform:rotate(-5deg)}
+.bp-art-mark{width:60px;height:60px;display:grid;place-items:center;color:#19844f;background:#e5f5e9;border-radius:18px;margin-bottom:20px}
+.bp-art-bar{height:10px;background:#e0ece0;border-radius:8px;margin:11px 0}.bp-art-bar-long{width:100%}.bp-art-bar-short{width:65%}
+.bp-art-check{display:flex;align-items:center;gap:7px;margin-top:25px;color:#19844f;font-weight:750;font-size:12px}
+.bp-steps-label{font-size:11px;font-weight:800;letter-spacing:.16em;color:#7c9180;margin:32px 0 15px}
+.bp-onboarding-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.bp-step{display:flex;position:relative;gap:15px;align-items:flex-start;min-height:120px;background:#fff;border:1px solid #e4ebe1;border-radius:19px;padding:23px;box-shadow:0 8px 22px rgba(27,64,40,.035)}
+.bp-step-current{border-color:#a4d8b5;background:#f8fdf8}
+.bp-step-num{display:grid;place-items:center;flex:none;width:37px;height:37px;border-radius:12px;color:#18804d;background:#eaf6ed;font-size:13px;font-weight:850}
+.bp-step strong{display:block;font-size:14px;color:#1a3525;margin:2px 0 8px}.bp-step p{font-size:12px;line-height:1.65;color:#7a8a7d;margin:0}.bp-step-status{position:absolute;right:13px;top:13px;font-size:9px;font-weight:800;color:#1b8f55;letter-spacing:.1em}
+@media(max-width:980px){.bp-onboarding-hero{grid-template-columns:1fr}.bp-onboarding-art{min-height:220px}.bp-onboarding-steps{grid-template-columns:1fr}}
+@media(max-width:580px){.bp-onboarding{margin:18px auto}.bp-onboarding-copy{padding:28px 23px}.bp-onboarding-hero{border-radius:21px}.bp-onboarding-copy h1{font-size:34px}.bp-onboarding-art{display:none}.bp-primary-action{width:100%}.bp-step{min-height:0}}
+@media(prefers-reduced-motion:reduce){.bp-primary-action{transition:none}.bp-primary-action:hover{transform:none}}

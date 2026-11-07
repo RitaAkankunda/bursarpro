@@ -183,7 +183,7 @@ class PaymentSearchService:
         """Filter by student's class"""
         if not class_level_id:
             return self.queryset
-        return self.queryset.filter(student__class_level_id=class_level_id)
+        return self.queryset.filter(class_level_id=class_level_id)
     
     def sort(self, sort_by):
         """
@@ -193,7 +193,7 @@ class PaymentSearchService:
         sort_map = {
             'date': '-payment_date',
             'amount': '-amount_paid',
-            'student': 'student__first_name',
+            'student': 'class_level__name',
             'status': 'status',
             'recent': '-payment_date',
         }
@@ -230,7 +230,7 @@ class FeeStructureSearchService:
     def __init__(self, school, queryset=None):
         self.school = school
         from .models import FeeStructure
-        self.queryset = queryset or FeeStructure.objects.filter(school=school)
+        self.queryset = queryset if queryset is not None else FeeStructure.objects.filter(term__school=school)
     
     def search(self, query):
         """
@@ -239,10 +239,8 @@ class FeeStructureSearchService:
         if not query or len(query.strip()) == 0:
             return self.queryset
         
-        q_obj = Q(student__first_name__icontains=query) | \
-                Q(student__last_name__icontains=query) | \
-                Q(fee_name__icontains=query) | \
-                Q(description__icontains=query)
+        q_obj = Q(class_level__name__icontains=query) | \
+                Q(term__name__icontains=query)
         
         return self.queryset.filter(q_obj)
     
@@ -256,7 +254,7 @@ class FeeStructureSearchService:
         """Filter by student's class"""
         if not class_level_id:
             return self.queryset
-        return self.queryset.filter(student__class_level_id=class_level_id)
+        return self.queryset.filter(class_level_id=class_level_id)
     
     def filter_by_amount_range(self, min_amount, max_amount):
         """Filter fees within amount range"""
@@ -282,10 +280,10 @@ class FeeStructureSearchService:
         Options: student, amount, term, date
         """
         sort_map = {
-            'student': 'student__first_name',
+            'student': 'class_level__name',
             'amount': '-amount',
             'term': 'term__name',
-            'date': '-created_at',
+            'date': '-id',
         }
         
         field = sort_map.get(sort_by, '-created_at')

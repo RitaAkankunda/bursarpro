@@ -108,6 +108,7 @@ class ClassLevelSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClassLevel
         fields = ['id', 'school', 'school_name', 'name']
+        read_only_fields = ['id', 'school', 'school_name']
 
 
 class TermSerializer(serializers.ModelSerializer):
@@ -139,6 +140,55 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount', 'payment_date', 'payment_method',
             'receipt_number', 'recorded_by', 'recorded_by_name', 'created_at'
         ]
+
+    def validate(self, attrs):
+        """Guard new payment records against cross-school and invalid billing.
+
+        This is an interim creation guard; payment verification and settlement
+        statuses require a separate coordinated migration and rollout.
+        """
+        from decimal import Decimal
+        from django.db.models import Sum
+        from rest_framework.exceptions import PermissionDenied
+        from .models import UserRole, FeeStructure, Payment
+
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            raise PermissionDenied('Authentication required.')
+        role = UserRole.objects.filter(user=request.user).select_related('school').first()
+        if not role or role.role != 'BURSAR' or not role.school_id:
+            raise PermissionDenied('School bursar access is required to record payments.')
+
+        student = attrs.get('student', getattr(self.instance, 'student', None))
+        term = attrs.get('term', getattr(self.instance, 'term', None))
+        if student is None or term is None:
+            raise serializers.ValidationError('Student and term are required.')
+        if student.school_id != role.school_id or term.school_id != role.school_id:
+            raise PermissionDenied('Student and term must belong to your school.')
+        if not student.class_level_id or student.class_level.school_id != role.school_id:
+            raise serializers.ValidationError({'student': 'Student must have a class in your school.'})
+
+        if self.instance and (student.pk != self.instance.student_id or term.pk != self.instance.term_id):
+            raise serializers.ValidationError('Moving a recorded payment to another student or term is not permitted.')
+
+        amount = attrs.get('amount', getattr(self.instance, 'amount', None))
+        if amount is None or amount <= Decimal('0'):
+            raise serializers.ValidationError({'amount': 'Payment amount must be positive.'})
+        fee = FeeStructure.objects.filter(
+            term=term, class_level=student.class_level
+        ).first()
+        if fee is None:
+            raise serializers.ValidationError({'student': 'No fee structure applies to this student and term.'})
+
+        # Existing payments are included here because the legacy system has no
+        # authoritative verification state yet. This is *not* settlement logic.
+        paid = Payment.objects.filter(student=student, term=term)
+        if self.instance:
+            paid = paid.exclude(pk=self.instance.pk)
+        received = paid.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        if received + amount > fee.amount:
+            raise serializers.ValidationError({'amount': 'Amount exceeds the remaining fee balance.'})
+        return attrs
 
     def get_student_name(self, obj):
         return f"{obj.student.first_name} {obj.student.last_name}"

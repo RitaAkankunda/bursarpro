@@ -68,22 +68,22 @@ const Sidebar = () => {
   const navItems = userRole ? allItems.filter(item => item.roles.includes(userRole)) : baseNavItems;
 
   const roleBadgeColors = {
-    BURSAR:     'rgba(14,165,233,0.15)',
+    BURSAR:     'rgba(18,127,75,0.15)',
     HEADMASTER: 'rgba(139,92,246,0.15)',
     TEACHER:    'rgba(234,179,8,0.15)',
     PARENT:     'rgba(236,72,153,0.15)',
   };
   const roleBadgeBorder = {
-    BURSAR:     'rgba(14,165,233,0.4)',
+    BURSAR:     'rgba(18,127,75,0.4)',
     HEADMASTER: 'rgba(139,92,246,0.4)',
     TEACHER:    'rgba(234,179,8,0.4)',
     PARENT:     'rgba(236,72,153,0.4)',
   };
   const roleBadgeText = {
-    BURSAR:     '#38bdf8',
-    HEADMASTER: '#a78bfa',
-    TEACHER:    '#fde047',
-    PARENT:     '#f9a8d4',
+    BURSAR:     '#178755',
+    HEADMASTER: '#775da6',
+    TEACHER:    '#a66a14',
+    PARENT:     '#a84c78',
   };
 
   const sidebarContent = (
@@ -91,7 +91,7 @@ const Sidebar = () => {
       {/* Logo */}
       <div style={styles.logoRow}>
         <div style={styles.logoIcon}>
-          <Layers size={22} color="#38bdf8" strokeWidth={2} />
+          <Layers size={22} color="#178755" strokeWidth={2} />
         </div>
         <div>
           <span style={styles.logoName}>BursarPro</span>
@@ -131,9 +131,9 @@ const Sidebar = () => {
             {userRole && (
               <span style={{
                 ...styles.roleBadge,
-                background: roleBadgeColors[userRole] || 'rgba(56,189,248,0.1)',
-                border: `1px solid ${roleBadgeBorder[userRole] || 'rgba(56,189,248,0.3)'}`,
-                color: roleBadgeText[userRole] || '#38bdf8',
+                background: roleBadgeColors[userRole] || 'rgba(18,127,75,0.1)',
+                border: `1px solid ${roleBadgeBorder[userRole] || 'rgba(18,127,75,0.3)'}`,
+                color: roleBadgeText[userRole] || '#178755',
               }}>
                 {userRole}
               </span>
@@ -154,7 +154,7 @@ const Sidebar = () => {
       {/* Mobile hamburger */}
       {isMobile && (
         <button onClick={() => setSidebarOpen(!sidebarOpen)} style={styles.hamburger}>
-          {sidebarOpen ? <X size={22} color="#38bdf8" /> : <Menu size={22} color="#38bdf8" />}
+          {sidebarOpen ? <X size={22} color="#178755" /> : <Menu size={22} color="#178755" />}
         </button>
       )}
 
@@ -202,13 +202,13 @@ const styles = {
   },
   sidebar: {
     height: '100%',
-    background: 'rgba(8,18,36,0.92)',
-    borderRight: '1px solid rgba(56,189,248,0.12)',
+    background: '#f9fcf7',
+    borderRight: '1px solid rgba(18,127,75,0.12)',
     backdropFilter: 'blur(24px)',
     display: 'flex',
     flexDirection: 'column',
     fontFamily: "'Inter', 'Outfit', sans-serif",
-    boxShadow: '4px 0 30px rgba(0,0,0,0.4)',
+    boxShadow: '4px 0 30px rgba(18,52,32,0.05)',
   },
   logoRow: {
     display: 'flex', alignItems: 'center', gap: '12px',
@@ -216,22 +216,22 @@ const styles = {
   },
   logoIcon: {
     width: '42px', height: '42px', borderRadius: '12px',
-    background: 'linear-gradient(135deg, #0c2d4a, #0e3a5c)',
-    border: '1px solid rgba(56,189,248,0.35)',
+    background: 'linear-gradient(135deg, #e8f5eb, #d9ecdf)',
+    border: '1px solid rgba(18,127,75,0.35)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 0 16px rgba(56,189,248,0.2)',
+    boxShadow: '0 0 16px rgba(18,127,75,0.2)',
     flexShrink: 0,
   },
   logoName: {
     display: 'block', fontSize: '17px', fontWeight: '800',
-    color: '#f0f9ff', letterSpacing: '0.3px', lineHeight: 1.2,
+    color: '#173628', letterSpacing: '0.3px', lineHeight: 1.2,
   },
   logoSub: {
     display: 'block', fontSize: '9px', fontWeight: '700',
-    color: '#38bdf8', letterSpacing: '2px', textTransform: 'uppercase', opacity: 0.8,
+    color: '#178755', letterSpacing: '2px', textTransform: 'uppercase', opacity: 0.8,
   },
   divider: {
-    height: '1px', background: 'rgba(56,189,248,0.1)', margin: '0 16px 12px',
+    height: '1px', background: 'rgba(18,127,75,0.1)', margin: '0 16px 12px',
   },
   nav: {
     flex: 1, padding: '4px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px',
@@ -239,35 +239,35 @@ const styles = {
   navLink: {
     display: 'flex', alignItems: 'center', gap: '12px',
     padding: '10px 14px', borderRadius: '10px',
-    color: '#94a3b8', fontWeight: '600', fontSize: '13.5px',
+    color: '#687d70', fontWeight: '600', fontSize: '13.5px',
     textDecoration: 'none', transition: 'all 0.18s',
     border: '1px solid transparent',
   },
   navLinkActive: {
-    background: 'rgba(56,189,248,0.12)',
-    border: '1px solid rgba(56,189,248,0.3)',
-    color: '#38bdf8',
-    boxShadow: '0 0 12px rgba(56,189,248,0.1)',
+    background: 'rgba(18,127,75,0.12)',
+    border: '1px solid rgba(18,127,75,0.3)',
+    color: '#178755',
+    boxShadow: '0 0 12px rgba(18,127,75,0.1)',
   },
   footer: {
     padding: '12px 14px 16px',
-    borderTop: '1px solid rgba(56,189,248,0.1)',
+    borderTop: '1px solid rgba(18,127,75,0.1)',
   },
   userCard: {
     display: 'flex', alignItems: 'center', gap: '10px',
-    background: 'rgba(56,189,248,0.05)',
-    border: '1px solid rgba(56,189,248,0.1)',
+    background: 'rgba(18,127,75,0.05)',
+    border: '1px solid rgba(18,127,75,0.1)',
     borderRadius: '12px', padding: '10px 12px', marginBottom: '10px',
   },
   userAvatar: {
     width: '34px', height: '34px', borderRadius: '50%',
-    background: 'linear-gradient(135deg, #0c2d4a, #0ea5e9)',
-    border: '1px solid rgba(56,189,248,0.4)',
+    background: 'linear-gradient(135deg, #167b49, #37b475)',
+    border: '1px solid rgba(18,127,75,0.4)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: '13px', fontWeight: '800', color: '#f0f9ff', flexShrink: 0,
+    fontSize: '13px', fontWeight: '800', color: '#ffffff', flexShrink: 0,
   },
   userName: {
-    fontSize: '13px', fontWeight: '700', color: '#e2e8f0',
+    fontSize: '13px', fontWeight: '700', color: '#263e31',
     margin: '0 0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     maxWidth: '130px',
   },
@@ -279,13 +279,13 @@ const styles = {
     width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
     padding: '10px 14px', borderRadius: '10px',
     background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-    color: '#fca5a5', fontWeight: '600', fontSize: '13px',
+    color: '#b7424b', fontWeight: '600', fontSize: '13px',
     cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s',
   },
   hamburger: {
     position: 'fixed', top: '14px', left: '14px', zIndex: 60,
     width: '40px', height: '40px', borderRadius: '10px',
-    background: 'rgba(8,18,36,0.9)', border: '1px solid rgba(56,189,248,0.25)',
+    background: '#ffffff', border: '1px solid rgba(18,127,75,0.25)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', backdropFilter: 'blur(12px)',
   },

@@ -1,3 +1,5 @@
+import '../design-system/dashboard-shell.css';
+import { normalizeDashboardMetrics } from '../features/finance/domain/dashboardMetrics.js';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
 import { useDashboard } from '../context/DashboardContext';
@@ -59,7 +61,7 @@ const StatCard = ({ title, value, icon, color = 'orange', subtitle, delay, trend
             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">{title}</p>
             <div className="flex items-baseline gap-2 mt-2">
               <h3 className="text-3xl font-black text-gray-900">
-                {typeof value === 'number' ? (title.includes('Student') ? value.toLocaleString() : `UGX ${value.toLocaleString()}`) : value}
+                {typeof value === 'number' ? `UGX ${value.toLocaleString()}` : (value ?? '—')}
               </h3>
               {trend && (
                 <span className={`text-sm font-semibold flex items-center gap-1 ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -167,7 +169,8 @@ const CollectionBreakdownCard = ({ data, setSelectedClass }) => (
 
 const Overview = () => {
   const navigate = useNavigate();
-  const { dashboardStats, updateStats, selectedTerm, updateTerm } = useDashboard();
+  const { dashboardStats: rawDashboardStats, updateStats, selectedTerm, updateTerm } = useDashboard();
+  const dashboardStats = useMemo(() => normalizeDashboardMetrics(rawDashboardStats), [rawDashboardStats]);
   const [terms, setTerms] = useState([]);
   const [localSelectedTerm, setLocalSelectedTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState(null);
@@ -306,23 +309,34 @@ const Overview = () => {
   if (!termsLoading && terms.length === 0) {
     return (
       <DashboardLayout>
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-          <div className="flex flex-col items-center justify-center backdrop-blur-md bg-white/5 rounded-2xl border border-white/10 shadow-2xl p-12 max-w-md text-center space-y-6">
-            <div className="p-4 bg-red-500/10 rounded-full">
-              <AlertCircle className="w-16 h-16 text-red-500" />
+        <section className="bp-onboarding" aria-labelledby="bp-onboarding-heading">
+          <div className="bp-onboarding-kicker"><span className="bp-pulse" /> YOUR WORKSPACE IS READY</div>
+          <div className="bp-onboarding-hero">
+            <div className="bp-onboarding-copy">
+              <span className="bp-step-label">WELCOME TO BURSARPRO · STEP 01 OF 03</span>
+              <h1 id="bp-onboarding-heading">A clearer way to run your <em>school finances.</em></h1>
+              <p>Your account is ready. Before we can show accurate collections and balances, your school needs an academic term. Start with setup, then bring in students and fee structures.</p>
+              <button type="button" className="bp-primary-action" onClick={() => navigate('/settings')}>
+                Set up academic term <ChevronRight size={19} aria-hidden="true" />
+              </button>
+              <p className="bp-onboarding-note">No financial data is generated until your school is configured.</p>
             </div>
-            <div className="space-y-2">
-              <h2 className="text-3xl font-black tracking-tight text-white">No Active Terms</h2>
-              <p className="text-text-muted max-w-md font-medium">You need to set up academic terms before viewing dashboard statistics.</p>
+            <div className="bp-onboarding-art" aria-hidden="true">
+              <div className="bp-art-orbit bp-art-orbit-one" /><div className="bp-art-orbit bp-art-orbit-two" />
+              <div className="bp-art-card">
+                <div className="bp-art-mark"><Calendar size={30} /></div>
+                <div className="bp-art-bar bp-art-bar-long" /><div className="bp-art-bar bp-art-bar-short" />
+                <div className="bp-art-check"><CheckCircle2 size={18} /> Your next step</div>
+              </div>
             </div>
-            <button 
-              onClick={() => navigate('/settings')} 
-              className="px-8 py-4 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg active:scale-95 w-full flex items-center justify-center gap-2"
-            >
-              Go to Settings <ChevronRight size={18} />
-            </button>
           </div>
-        </div>
+          <div className="bp-steps-label">GETTING STARTED</div>
+          <div className="bp-onboarding-steps">
+            <div className="bp-step bp-step-current"><div className="bp-step-num">01</div><div><strong>Set up an academic term</strong><p>Choose the term and school year used for reporting.</p></div><span className="bp-step-status">NEXT</span></div>
+            <div className="bp-step"><div className="bp-step-num">02</div><div><strong>Add your students</strong><p>Build your school's student records.</p></div></div>
+            <div className="bp-step"><div className="bp-step-num">03</div><div><strong>Configure school fees</strong><p>Prepare fee structures before recording collections.</p></div></div>
+          </div>
+        </section>
       </DashboardLayout>
     );
   }
@@ -423,7 +437,7 @@ const Overview = () => {
                 value={dashboardStats.total_expected}
                 icon={<TrendingUp size={24} />}
                 color="blue"
-                subtitle={`${dashboardStats.total_students} students`}
+                subtitle={`${dashboardStats.total_students ?? "—"} students`}
                 delay={0.1}
               />
               <StatCard 
@@ -431,8 +445,8 @@ const Overview = () => {
                 value={dashboardStats.total_collected}
                 icon={<CheckCircle2 size={24} />}
                 color="green"
-                subtitle={`${dashboardStats.students_paid} students paid`}
-                trend={dashboardStats.collection_rate_percent > 50 ? 12 : -8}
+                subtitle={`${dashboardStats.students_paid ?? "—"} students paid`}
+                
                 delay={0.2}
               />
               <StatCard 
@@ -440,7 +454,7 @@ const Overview = () => {
                 value={dashboardStats.total_outstanding}
                 icon={<AlertTriangle size={24} />}
                 color="red"
-                subtitle={`${dashboardStats.students_unpaid} students pending`}
+                subtitle={`${dashboardStats.students_unpaid ?? "—"} students pending`}
                 delay={0.3}
               />
               <StatCard 
@@ -453,7 +467,7 @@ const Overview = () => {
               />
               <StatCard 
                 title="Collection Rate"
-                value={`${dashboardStats.collection_rate_percent}%`}
+                value={dashboardStats.collection_rate_percent == null ? "—" : `${dashboardStats.collection_rate_percent}%`}
                 icon={<TrendingUp size={24} />}
                 color="orange"
                 subtitle="Progress to target"

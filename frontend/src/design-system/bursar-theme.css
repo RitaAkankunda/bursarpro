@@ -1,0 +1,26 @@
+/* B2: contained dashboard design tokens. Does not override global Tailwind theme. */
+.bp-metric {
+  --bp-ink: #183b32;
+  --bp-muted: #61736b;
+  --bp-emerald: #146a50;
+  --bp-stroke: #e4e9df;
+  position: relative;
+  padding: clamp(1.25rem, 2vw, 1.55rem);
+  border: 1px solid var(--bp-stroke);
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, #fffefa 0%, #f5f8f1 100%);
+  color: var(--bp-ink);
+  box-shadow: 0 12px 32px rgba(31, 62, 44, .055);
+  overflow: hidden;
+  min-width: 0;
+}
+.bp-metric::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, #1b775a, #acd6ab); }
+.bp-metric__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.bp-metric__eyebrow { color: var(--bp-muted); font-size: .77rem; letter-spacing: .09em; font-weight: 750; text-transform: uppercase; }
+.bp-metric__icon { width: 40px; height: 40px; border-radius: 12px; background: #e8f3e9; color: var(--bp-emerald); display: grid; place-items: center; flex: none; }
+.bp-metric__value { margin-top: 1.25rem; font-size: clamp(1.35rem, 2vw, 1.95rem); letter-spacing: -.045em; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.bp-metric__trend { margin-top: .7rem; display: flex; gap: .25rem; align-items: center; font-weight: 700; font-size: .77rem; }
+.bp-metric__trend--up { color: #247456; }.bp-metric__trend--down { color: #ab493e; }
+.bp-metric__trend-label { font-weight: 450; color: var(--bp-muted); padding-left: .3rem; }
+.bp-metric__subtitle { margin: .7rem 0 0; font-size: .8rem; color: var(--bp-muted); }
+@media (prefers-reduced-motion: reduce) { .bp-metric { scroll-behavior: auto; } }

@@ -9,22 +9,12 @@ const DashboardLayout = ({ children }) => {
     <div
       style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0a1628 0%, #062236 50%, #0a1f2e 100%)',
+        background: 'linear-gradient(145deg, #f8faf5 0%, #f1f7ee 55%, #eef5ea 100%)',
         backgroundAttachment: 'fixed',
       }}
       className="flex flex-col md:flex-row font-outfit relative overflow-hidden"
     >
-      {/* Cyan glow blobs */}
-      <div className="blob-tl" />
-      <div className="blob-br" />
-      {/* Extra mid blob */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '55%',
-        width: '340px', height: '340px',
-        background: 'radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 70%)',
-        borderRadius: '50%', pointerEvents: 'none',
-        transform: 'translate(-50%,-50%)',
-      }} />
+
 
       <Sidebar />
 

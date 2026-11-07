@@ -35,6 +35,7 @@ import BulkImportModal from '../components/BulkImportModal';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TableSkeleton } from '../components/SkeletonLoader';
 import toast from 'react-hot-toast';
+import '../design-system/payment-recording.css';
 
 // Improved Confirmation Dialog Component
 const ConfirmDialog = ({ isOpen, title, message, icon: Icon = AlertTriangle, isDangerous = false, onConfirm, onCancel, confirmText = "Confirm", cancelText = "Cancel", isLoading = false }) => {
@@ -112,263 +113,90 @@ const ConfirmDialog = ({ isOpen, title, message, icon: Icon = AlertTriangle, isD
   );
 };
 
-const PaymentDrawer = ({ isOpen, students, terms, selectedTerm, onPaymentSuccess }) => {
-  const { addPayment } = useDashboard();
-  const [form, setForm] = useState({
-    student: '',
-    term: selectedTerm,
-    amount: '',
-    payment_date: new Date().toISOString().split('T')[0],
-    payment_method: 'CASH',
-    receipt_number: `REC-${Date.now()}`
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [successSteps, setSuccessSteps] = useState({
-    payment: false,
-    dashboard: false,
-    sms: false
-  });
-
-  // Update term when selectedTerm changes
-  useEffect(() => {
-    setForm(f => ({ ...f, term: selectedTerm }));
-  }, [selectedTerm]);
-
-  // Auto-populate amount when student and term are selected
-  useEffect(() => {
-    if (form.student && form.term) {
-      const selectedStudent = students.find(s => s.id == form.student);
-      if (selectedStudent && selectedStudent.class_level) {
-        // Fetch the fee structure for this student's class and term
-        api.get(`/fee-structures/?term_id=${form.term}&class_level_id=${selectedStudent.class_level}`)
-          .then(res => {
-            if (res.data && res.data.length > 0) {
-              const fee = res.data[0];
-              setForm(f => ({ ...f, amount: fee.amount }));
-            }
-          })
-          .catch(err => console.error('Error fetching fee:', err));
-      }
-    }
-  }, [form.student, form.term, students]);
-
+const PaymentDrawer = ({ isOpen, students, terms, selectedTerm, onPaymentSuccess, onClose }) => {
   const queryClient = useQueryClient();
+  const [form, setForm] = useState({ student: '', term: selectedTerm || '', amount: '', payment_date: new Date().toLocaleDateString('en-CA'), payment_method: 'CASH' });
+  const [billing, setBilling] = useState({ loading: false, fee: null, balance: null, error: '' });
+  const [error, setError] = useState('');
+  useEffect(() => { if (isOpen) { setForm(f => ({ ...f, term: selectedTerm || f.term, amount: '' })); setError(''); } }, [isOpen, selectedTerm]);
+  useEffect(() => {
+    if (!isOpen || !form.student || !form.term) { setBilling({ loading: false, fee: null, balance: null, error: '' }); return; }
+    let active = true;
+    const student = students.find(s => String(s.id) === String(form.student));
+    if (!student?.class_level) { setBilling({ loading: false, fee: null, balance: null, error: 'Student has no assigned class.' }); return; }
+    setBilling({ loading: true, fee: null, balance: null, error: '' });
+    Promise.all([
+      api.get(`/fee-structures/?term_id=${encodeURIComponent(form.term)}&class_level_id=${encodeURIComponent(student.class_level)}`),
+      api.get(`/students/?term_id=${encodeURIComponent(form.term)}&no_paginate=true`)
+    ]).then(([feesResponse, studentsResponse]) => {
+      if (!active) return;
+      const fees = Array.isArray(feesResponse.data) ? feesResponse.data : feesResponse.data?.results || [];
+      const studentsForTerm = Array.isArray(studentsResponse.data) ? studentsResponse.data : studentsResponse.data?.results || [];
+      const fee = fees.find(f => String(f.class_level) === String(student.class_level) && String(f.term) === String(form.term));
+      const billedStudent = studentsForTerm.find(s => String(s.id) === String(form.student));
+      const feeNumber = fee ? Number(fee.amount) : null;
+      const balanceNumber = billedStudent?.balance == null ? null : Number(billedStudent.balance);
+      setBilling({ loading: false, fee: Number.isFinite(feeNumber) ? feeNumber : null, balance: Number.isFinite(balanceNumber) ? balanceNumber : null, error: fee ? '' : 'No fee structure for this class and term.' });
+    }).catch(() => { if (active) setBilling({ loading: false, fee: null, balance: null, error: 'Unable to load student billing. Check your connection.' }); });
+    return () => { active = false; };
+  }, [isOpen, form.student, form.term, students]);
 
+  const money = value => `UGX ${Number(value).toLocaleString('en-UG', { maximumFractionDigits: 2 })}`;
+  const parsedAmount = Number(form.amount);
+  const valid = form.student && form.term && !billing.loading && billing.fee !== null && billing.balance !== null && billing.balance > 0 && form.amount !== '' && Number.isFinite(parsedAmount) && parsedAmount > 0 && Number.isInteger(parsedAmount * 100) && parsedAmount <= billing.balance;
   const mutation = useMutation({
-    mutationFn: (paymentForm) => api.post('/payments/', paymentForm),
-    onSuccess: (res) => {
-      onPaymentSuccess(res.data);
-      setSuccessSteps(s => ({ ...s, payment: true }));
-      
-      setTimeout(() => {
-        addPayment(form.amount);
-        setSuccessSteps(s => ({ ...s, dashboard: true }));
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
-      }, 400);
-
-      setTimeout(() => setSuccessSteps(s => ({ ...s, sms: true })), 800);
-      
-      setSuccess(true);
-      toast.success('Payment recorded successfully!');
-      
-      setTimeout(() => {
-        setForm({
-          student: '',
-          term: selectedTerm,
-          amount: '',
-          payment_date: new Date().toISOString().split('T')[0],
-          payment_method: 'CASH',
-          receipt_number: `REC-${Date.now()}`
-        });
-        setSuccess(false);
-      }, 2000);
+    mutationFn: payload => api.post('/payments/', payload),
+    onSuccess: res => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      onPaymentSuccess?.(res.data);
+      toast.success('Payment saved. Verify the receipt in Payment Tracker.');
+      onClose?.();
+      setForm(f => ({ ...f, student: '', amount: '' }));
     },
-    onError: (err) => {
-      const errorMsg = err.response?.data?.detail || err.response?.data?.non_field_errors?.[0] || 'Failed to record payment';
-      toast.error(errorMsg);
+    onError: err => {
+      const details = err.response?.data;
+      const message = typeof details?.detail === 'string' ? details.detail : (details && typeof details === 'object' ? Object.values(details).flat().join(' ') : null);
+      setError(message || 'Could not record payment. No success has been confirmed.');
     }
   });
-
-  const handleSubmit = (e) => {
+  const handleSubmit = e => {
     e.preventDefault();
-    setSuccess(false);
-    setSuccessSteps({ payment: false, dashboard: false, sms: false });
-    mutation.mutate(form);
+    if (mutation.isPending || !valid) return;
+    setError('');
+    mutation.mutate({ ...form, amount: parsedAmount.toFixed(2), receipt_number: `REC-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}` });
   };
-
+  if (!isOpen) return null;
   return (
-    <motion.div
-      initial={{ x: 400 }}
-      animate={{ x: isOpen ? 0 : 400 }}
-      transition={{ duration: 0.3, type: 'spring', stiffness: 300, damping: 30 }}
-      className="fixed right-0 top-0 h-screen w-96 bg-gradient-to-b from-white to-gray-50 border-l border-gray-300 z-40 overflow-y-auto"
-    >
-      <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-200 px-8 py-6 flex items-center justify-between">
-        <h2 className="text-2xl font-black text-gray-800">Record Payment</h2>
-      </div>
-
-      <form onSubmit={handleSubmit} className="p-8 space-y-6">
-        {/* Replaced generic error block with toast */}
-
-        {success && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="p-4 bg-emerald-400/10 border border-emerald-400/20 rounded-xl space-y-3"
-          >
-            <div className="flex items-center gap-3 text-emerald-400 font-bold">
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-              <span>Payment Successfully Processed!</span>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-3 text-emerald-400">
-                <motion.div 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }} 
-                  transition={{ delay: 0 }}
-                  className="w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center text-gray-800 text-xs"
-                >
-                  ✓
-                </motion.div>
-                <span className="font-medium">Payment recorded to database</span>
-              </div>
-              <div className="flex items-center gap-3 text-emerald-400">
-                <motion.div 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }} 
-                  transition={{ delay: 0.3 }}
-                  className="w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center text-gray-800 text-xs"
-                >
-                  ✓
-                </motion.div>
-                <span className="font-medium">Dashboard stats updated live</span>
-              </div>
-              <div className="flex items-center gap-3 text-emerald-400">
-                <motion.div 
-                  initial={{ scale: 0 }} 
-                  animate={{ scale: 1 }} 
-                  transition={{ delay: 0.6 }}
-                  className="w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center text-gray-800 text-xs"
-                >
-                  ✓
-                </motion.div>
-                <span className="font-medium">SMS notification sent to parent</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        <div>
-          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Student</label>
-          <div className="relative">
-            <select
-              required
-              value={form.student}
-              onChange={(e) => setForm({ ...form, student: e.target.value })}
-              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/50 text-sm appearance-none cursor-pointer pr-10 text-gray-800"
-            >
-              <option value="" className="bg-white text-gray-800 text-gray-800">Select a student</option>
-              {students.map(s => (
-                <option key={s.id} value={s.id} className="bg-white text-gray-800 text-gray-800">{s.first_name} {s.last_name} ({s.student_id})</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-3 top-3 text-gray-600 text-xs">▼</div>
+    <div className="bp-payment-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && !mutation.isPending) onClose?.(); }}>
+      <section className="bp-payment-dialog" role="dialog" aria-modal="true" aria-labelledby="bp-payment-title">
+        <header className="bp-payment-header">
+          <div><span className="bp-payment-eyebrow">SCHOOL FINANCE</span><h2 id="bp-payment-title">Record student payment</h2><p>Review the outstanding fee before recording money received.</p></div>
+          <button type="button" className="bp-payment-close" aria-label="Close payment form" disabled={mutation.isPending} onClick={onClose}><X size={20} /></button>
+        </header>
+        <form onSubmit={handleSubmit} className="bp-payment-body">
+          <div className="bp-payment-grid">
+            <label>Student <select required value={form.student} onChange={e => { setForm(f => ({ ...f, student: e.target.value, amount: '' })); setError(''); }}><option value="">Select a student</option>{students.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.student_id})</option>)}</select></label>
+            <label>Academic term <select required value={form.term} onChange={e => setForm(f => ({ ...f, term: e.target.value, amount: '' }))}><option value="">Select a term</option>{terms.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
           </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Term</label>
-          <div className="relative">
-            <select
-              required
-              value={form.term}
-              onChange={(e) => setForm({ ...form, term: e.target.value })}
-              className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/50 text-sm appearance-none cursor-pointer pr-10 text-gray-800"
-            >
-              {terms.map(t => (
-                <option key={t.id} value={t.id} className="bg-white text-gray-800 text-gray-800">{t.name}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-3 top-3 text-gray-600 text-xs">▼</div>
+          <div className="bp-payment-summary" aria-live="polite">
+            <div><span>Assigned term fee</span><strong>{billing.loading ? 'Loading…' : billing.fee == null ? 'Not available' : money(billing.fee)}</strong></div>
+            <div><span>Outstanding before payment</span><strong>{billing.loading ? 'Loading…' : billing.balance == null ? 'Not available' : money(billing.balance)}</strong></div>
+            {billing.error && <p className="bp-payment-error">{billing.error}</p>}
           </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider">Amount (UGX)</label>
-            {form.amount && form.student && (
-              <span className="text-[10px] text-emerald-400 font-bold">✓ Auto-calculated</span>
-            )}
+          <div className="bp-payment-grid">
+            <label>Amount received (UGX) <input type="number" min="0.01" step="0.01" required inputMode="decimal" placeholder="Enter actual amount paid" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} /></label>
+            <label>Payment date <input type="date" required value={form.payment_date} onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))} /></label>
           </div>
-          <input
-            type="number"
-            required
-            value={form.amount}
-            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-            className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-            placeholder="Select a student and term to auto-populate"
-          />
-          {form.amount && (
-            <p className="text-xs text-gray-600 mt-2">
-              Expected fee: <span className="text-emerald-400 font-bold">UGX {Number(form.amount).toLocaleString()}</span>
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Payment Date</label>
-          <input
-            type="date"
-            required
-            value={form.payment_date}
-            onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-            className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Payment Method</label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { value: 'CASH', label: 'Cash', icon: <Banknote size={16} /> },
-              { value: 'MOBILE_MONEY', label: 'Mobile Money', icon: <Smartphone size={16} /> },
-              { value: 'BANK_TRANSFER', label: 'Bank', icon: <CreditCard size={16} /> }
-            ].map(method => (
-              <button
-                key={method.value}
-                type="button"
-                onClick={() => setForm({ ...form, payment_method: method.value })}
-                className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center gap-2 font-bold text-xs ${
-                  form.payment_method === method.value
-                    ? 'border-primary bg-blue-50 text-blue-600'
-                    : 'border-gray-300 bg-gray-50 text-gray-600 hover:border-primary/50'
-                }`}
-              >
-                {method.icon}
-                {method.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="w-full py-4 bg-blue-600 shadow-lg hover:shadow-blue-600/30 hover:bg-blue-700 rounded-xl font-bold text-gray-800 hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-50 text-lg"
-        >
-          {mutation.isPending ? <Loader2 className="animate-spin inline mr-2" size={20} /> : <CheckCircle2 className="inline mr-2" size={20} />}
-          Record Payment
-        </button>
-
-        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
-          <p className="text-gray-600"><span className="font-bold">Receipt #:</span> {form.receipt_number}</p>
-          <p className="text-gray-600 font-mono">{form.payment_date}</p>
-        </div>
-      </form>
-    </motion.div>
+          <fieldset className="bp-payment-methods"><legend>Payment method</legend>{[['CASH','Cash'], ['MOBILE_MONEY','Mobile money'], ['BANK_TRANSFER','Bank transfer']].map(([id,label]) => <label key={id} className={form.payment_method === id ? 'active' : ''}><input type="radio" name="payment-method" value={id} checked={form.payment_method === id} onChange={() => setForm(f => ({ ...f, payment_method: id }))} />{label}</label>)}</fieldset>
+          <div className="bp-payment-result"><span>Estimated balance after payment</span><strong>{valid ? money(Math.max(0, billing.balance - parsedAmount)) : '—'}</strong><small>Preview only; the server confirms the final balance.</small></div>
+          {form.amount && billing.balance !== null && parsedAmount > billing.balance && <p className="bp-payment-error">Amount exceeds the outstanding balance.</p>}
+          {error && <p role="alert" className="bp-payment-error">{error}</p>}
+          <footer className="bp-payment-footer"><button type="button" className="bp-payment-cancel" onClick={onClose} disabled={mutation.isPending}>Cancel</button><button type="submit" className="bp-payment-submit" disabled={!valid || mutation.isPending}>{mutation.isPending ? 'Saving…' : 'Confirm payment'}</button></footer>
+        </form>
+      </section>
+    </div>
   );
 };
 
@@ -912,18 +740,9 @@ const Payments = () => {
         terms={terms}
         selectedTerm={selectedTerm}
         onPaymentSuccess={handlePaymentSuccess}
+        onClose={() => setShowDrawer(false)}
       />
 
-      {/* Backdrop for drawer */}
-      {showDrawer && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setShowDrawer(false)}
-          className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-30"
-        />
-      )}
 
       {/* SMS Reminders Confirmation Dialog */}
       <ConfirmDialog

@@ -1,3 +1,4 @@
+import '../design-system/student-registration.css';
 import { useEffect, useState } from 'react';
 import { 
   Search, 
@@ -402,173 +403,93 @@ const StudentDetailsModal = ({ isOpen, student, onClose }) => {
   );
 };
 
-const AddStudentModal = ({ isOpen, onClose, onSuccess, classes }) => {
-  const [form, setForm] = useState({
-    first_name: '',
-    last_name: '',
-    student_id: '',
-    parent_name: '',
-    parent_phone: '',
-    class_level: ''
-  });
+const AddStudentModal = ({ isOpen, onClose, classes = [] }) => {
   const queryClient = useQueryClient();
+  const [form, setForm] = useState({ first_name: '', last_name: '', student_id: '', class_level: '', parent_name: '', parent_phone: '' });
+  const [newClass, setNewClass] = useState('');
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [classError, setClassError] = useState('');
+  const [showClassForm, setShowClassForm] = useState(false);
+  const [localClasses, setLocalClasses] = useState([]);
+  const availableClasses = [...classes, ...localClasses.filter(item => !classes.some(cls => String(cls.id) === String(item.id)))];
 
-  const mutation = useMutation({
-    mutationFn: (newStudent) => api.post('/students/', newStudent),
-    onSuccess: (res) => {
+  const saveStudent = useMutation({
+    mutationFn: (record) => api.post('/students/', record),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Student added successfully!');
-      setForm({
-        first_name: '',
-        last_name: '',
-        student_id: '',
-        parent_name: '',
-        parent_phone: '',
-        class_level: ''
-      });
+      toast.success('Student registered successfully');
+      setForm({ first_name: '', last_name: '', student_id: '', class_level: '', parent_name: '', parent_phone: '' });
       onClose();
     },
-    onError: (err) => {
-      const errorMsg = err.response?.data?.detail || err.response?.data?.student_id?.[0] || 'Failed to add student';
-      toast.error(errorMsg);
-    }
+    onError: (error) => {
+      const payload = error.response?.data;
+      const message = typeof payload?.detail === 'string' ? payload.detail :
+        Object.entries(payload || {}).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`).join(' • ');
+      toast.error(message || 'Could not register student. Check the details and retry.');
+    },
   });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    mutation.mutate(form);
+  const createClass = async (event) => {
+    event.preventDefault();
+    const name = newClass.trim();
+    if (!name) { setClassError('Enter a class name.'); return; }
+    if (availableClasses.some(cls => cls.name.trim().toLowerCase() === name.toLowerCase())) {
+      setClassError('This class already exists. Select it instead.'); return;
+    }
+    setCreatingClass(true);
+    setClassError('');
+    try {
+      // School ownership is resolved by Django from the authenticated user.
+      const response = await api.post('/class-levels/', { name });
+      const created = response.data;
+      if (!created?.id) throw new Error('Class creation returned no ID');
+      setLocalClasses(previous => [...previous, created]);
+      setForm(previous => ({ ...previous, class_level: String(created.id) }));
+      setNewClass('');
+      setShowClassForm(false);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      toast.success(`${created.name} created and selected`);
+    } catch (error) {
+      const payload = error.response?.data;
+      setClassError(payload?.detail || payload?.name?.[0] || 'Unable to create this class. Check permissions or try Setup → Classes.');
+    } finally { setCreatingClass(false); }
   };
 
   if (!isOpen) return null;
-
+  const update = (key, value) => setForm(previous => ({ ...previous, [key]: value }));
+  const submit = event => {
+    event.preventDefault();
+    if (!form.class_level || availableClasses.length === 0) { toast.error('Create or select a class first.'); return; }
+    saveStudent.mutate({ ...form, class_level: Number(form.class_level),
+      first_name: form.first_name.trim(), last_name: form.last_name.trim(),
+      student_id: form.student_id.trim(), parent_name: form.parent_name.trim(), parent_phone: form.parent_phone.trim() });
+  };
   return (
-    <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="backdrop-blur-md bg-white/60 shadow-lg w-full max-w-md p-8 rounded-3xl border border-gray-200 space-y-6"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-black text-gray-800">Add New Student</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Modal content begins */}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">First Name</label>
-              <input
-                type="text"
-                required
-                value={form.first_name}
-                onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                className="w-full px-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-                placeholder="John"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Last Name</label>
-              <input
-                type="text"
-                required
-                value={form.last_name}
-                onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                className="w-full px-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-                placeholder="Doe"
-              />
-            </div>
+    <div className="bsh-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !saveStudent.isPending) onClose(); }}>
+      <section className="bsh-modal" role="dialog" aria-modal="true" aria-labelledby="bsh-modal-title">
+        <header className="bsh-header">
+          <div><span className="bsh-eyebrow">STUDENT MANAGEMENT</span><h2 id="bsh-modal-title">Register a student</h2><p>Set up a student profile for your school.</p></div>
+          <button type="button" className="bsh-close" onClick={onClose} aria-label="Close registration"><X size={20}/></button>
+        </header>
+        <form onSubmit={submit} className="bsh-form">
+          <div className="bsh-two">
+            <label>First name <span>*</span><input autoComplete="off" required value={form.first_name} onChange={e => update('first_name', e.target.value)} /></label>
+            <label>Last name <span>*</span><input autoComplete="off" required value={form.last_name} onChange={e => update('last_name', e.target.value)} /></label>
           </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Student ID</label>
-            <input
-              type="text"
-              required
-              value={form.student_id}
-              onChange={(e) => setForm({ ...form, student_id: e.target.value })}
-              className="w-full px-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-              placeholder="e.g., STU001"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Class Level</label>
-            <div className="relative">
-              <select
-                required
-                value={form.class_level}
-                onChange={(e) => setForm({ ...form, class_level: e.target.value })}
-                className="w-full px-4 py-3 bg-white text-gray-900 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm appearance-none cursor-pointer pr-10 font-medium"
-              >
-                <option value="">
-                  {classes.length === 0 ? 'No classes available' : 'Select a class'}
-                </option>
-                {classes && classes.length > 0 ? (
-                  classes.map(cls => (
-                    <option key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </option>
-                  ))
-                ) : null}
-              </select>
-              <div className="pointer-events-none absolute right-3 top-3 text-gray-600 text-xs">▼</div>
-            </div>
-            {classes.length === 0 && (
-              <p className="text-xs text-accent mt-2">⚠️ No classes created yet. Go to Settings → Classes to add one.</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Parent Name</label>
-            <input
-              type="text"
-              required
-              value={form.parent_name}
-              onChange={(e) => setForm({ ...form, parent_name: e.target.value })}
-              className="w-full px-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-              placeholder="Parent/Guardian name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Parent Phone</label>
-            <input
-              type="tel"
-              required
-              value={form.parent_phone}
-              onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
-              className="w-full px-4 py-3 bg-white text-gray-900 placeholder-gray-400 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium"
-              placeholder="+256701234567"
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 border border-gray-300 rounded-xl font-bold hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="flex-1 py-3 bg-blue-600 shadow-lg hover:shadow-blue-600/30 hover:bg-blue-700 rounded-xl font-bold text-gray-800 hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-50"
-            >
-              {mutation.isPending ? <Loader2 className="animate-spin inline mr-2" size={18} /> : <UserPlus className="inline mr-2" size={18} />}
-              Add Student
-            </button>
-          </div>
+          <label>Admission / Student ID <span>*</span><input required value={form.student_id} onChange={e => update('student_id', e.target.value)} /><small>Use the identifier recorded by your school.</small></label>
+          <div className="bsh-class-row"><label htmlFor="bsh-class-select">Academic class <span>*</span></label><button type="button" className="bsh-text-button" onClick={() => { setShowClassForm(value => !value); setClassError(''); }}>{showClassForm ? 'Cancel class setup' : '+ Create class'}</button></div>
+          <select id="bsh-class-select" required value={form.class_level} onChange={e => update('class_level', e.target.value)}>
+            <option value="">{availableClasses.length ? 'Choose an academic class' : 'No classes created yet'}</option>
+            {availableClasses.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+          </select>
+          {availableClasses.length === 0 && !showClassForm && <div className="bsh-guidance"><strong>Start by creating a class.</strong><p>You can add one here without losing the student details already entered.</p><button type="button" onClick={() => setShowClassForm(true)}>Create first class →</button></div>}
+          {showClassForm && <div className="bsh-class-create"><h3>Create academic class</h3><p>For example, Senior 1 or Primary 4. The class will be selected automatically.</p><div className="bsh-inline"><input aria-label="New class name" value={newClass} onChange={e => setNewClass(e.target.value)} placeholder="e.g. Senior 1" maxLength={50}/><button type="button" onClick={createClass} disabled={creatingClass}>{creatingClass ? 'Saving…' : 'Save class'}</button></div>{classError && <p role="alert" className="bsh-error">{classError}</p>}</div>}
+          <div className="bsh-divider"><span>GUARDIAN DETAILS</span></div>
+          <label>Parent / Guardian name <span>*</span><input required value={form.parent_name} onChange={e => update('parent_name', e.target.value)} /></label>
+          <label>Parent / Guardian phone <span>*</span><input type="tel" required value={form.parent_phone} onChange={e => update('parent_phone', e.target.value)} /><small>Use an active number for authorized school communication.</small></label>
+          <footer className="bsh-footer"><button type="button" className="bsh-cancel" onClick={onClose}>Cancel</button><button type="submit" className="bsh-submit" disabled={saveStudent.isPending || !form.class_level}>{saveStudent.isPending ? 'Saving student…' : 'Save student'}</button></footer>
         </form>
-      </motion.div>
+      </section>
     </div>
   );
 };
@@ -629,12 +550,27 @@ const Students = () => {
     }
   }, [classes, selectedClass]);
 
+  const { data: billingTerms = [] } = useQuery({
+    queryKey: ['terms'],
+    queryFn: async () => {
+      const res = await api.get('/terms/');
+      return res.data?.results || res.data || [];
+    }
+  });
+  const [selectedBillingTerm, setSelectedBillingTerm] = useState('');
+  useEffect(() => {
+    if (billingTerms.length && !billingTerms.some(t => String(t.id) === String(selectedBillingTerm))) {
+      setSelectedBillingTerm(String(billingTerms[0].id));
+    }
+  }, [billingTerms, selectedBillingTerm]);
+
   const { data: studentsData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students', selectedClass, search, page],
+    queryKey: ['students', selectedClass, search, page, selectedBillingTerm],
     queryFn: async () => {
       let url = `/students/?page=${page}&`;
       if (selectedClass) url += `class_level_id=${selectedClass}&`;
-      if (search) url += `search=${search}`;
+      if (search) url += `search=${encodeURIComponent(search)}&`;
+      if (selectedBillingTerm) url += `term_id=${encodeURIComponent(selectedBillingTerm)}`;
       const res = await api.get(url);
       return res.data;
     }
@@ -647,15 +583,15 @@ const Students = () => {
   // Calculate student statistics
   const stats = {
     total: totalCount,
-    fullyPaid: students.filter(s => s.balance === 0 || !s.balance).length,
-    partiallypaid: students.filter(s => s.balance && s.balance > 0).length,
-    totalOutstanding: students.reduce((sum, s) => sum + (s.balance || 0), 0)
+    fullyPaid: selectedBillingTerm ? students.filter(s => s.balance !== null && s.balance !== undefined && Number(s.balance) === 0).length : 0,
+    partiallypaid: selectedBillingTerm ? students.filter(s => s.balance !== null && s.balance !== undefined && Number(s.balance) > 0).length : 0,
+    totalOutstanding: students.reduce((sum, s) => sum + Math.max(0, Number(s.balance) || 0), 0)
   };
 
   // Apply status filter
   const filteredByStatus = students.filter(s => {
-    if (statusFilter === 'paid') return s.balance === 0 || !s.balance;
-    if (statusFilter === 'owing') return s.balance && s.balance > 0;
+    if (statusFilter === 'paid') return selectedBillingTerm && s.balance != null && Number(s.balance) === 0;
+    if (statusFilter === 'owing') return selectedBillingTerm && s.balance != null && Number(s.balance) > 0;
     return true; // 'all'
   });
 
@@ -669,7 +605,7 @@ const Students = () => {
       comparison = (a.balance || 0) - (b.balance || 0);
     } else if (sortBy === 'status') {
       const getStatus = (student) => {
-        if (!student.balance || student.balance === 0) return 2; // Paid
+        if (student.balance == null) return 3; // Not billed / no term
         return 1; // Owing
       };
       comparison = getStatus(a) - getStatus(b);
@@ -764,7 +700,10 @@ const Students = () => {
 
   // Get payment status and styling
   const getPaymentStatus = (balance) => {
-    if (!balance || balance === 0) {
+    if (balance === null || balance === undefined) {
+      return { status: 'Not billed', icon: AlertCircle, color: 'bg-slate-100 text-slate-700', badge: '—' };
+    }
+    if (Number(balance) === 0) {
       return { status: 'Paid', icon: CheckCircle2, color: 'bg-green-100 text-green-700', badge: '✅' };
     } else {
       return { status: 'Owing', icon: AlertTriangle, color: 'bg-yellow-100 text-yellow-700', badge: '⚠️' };
@@ -868,6 +807,16 @@ const Students = () => {
             <NotificationBadge />
           </div>
         </header>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4">
+          <label htmlFor="student-billing-term" className="text-sm font-semibold text-emerald-900">Billing term</label>
+          <select id="student-billing-term" value={selectedBillingTerm} onChange={(e) => setSelectedBillingTerm(e.target.value)}
+            className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            {billingTerms.length === 0 && <option value="">No terms available</option>}
+            {billingTerms.map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
+          </select>
+          <p className="text-xs text-slate-600">Balances are calculated for the selected academic term. An unbilled student is not paid.</p>
+        </div>
 
         {/* STATISTICS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1135,10 +1084,10 @@ const Students = () => {
                         </td>
                         <td className="px-8 py-5">
                           <div className="flex flex-col">
-                            <span className={`font-black text-sm ${!student.balance || student.balance === 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              UGX {(student.balance || 0).toLocaleString()}
+                            <span className={`font-black text-sm ${student.balance == null ? 'text-slate-600' : Number(student.balance) <= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                              {student.balance == null ? 'Not billed' : `UGX ${Number(student.balance).toLocaleString()}`}
                             </span>
-                            <span className="text-xs text-gray-500">{!student.balance || student.balance === 0 ? 'Settled' : 'Owing'}</span>
+                            <span className="text-xs text-gray-500">{student.balance == null ? 'No fee for selected term' : Number(student.balance) <= 0 ? 'Settled' : 'Owing'}</span>
                           </div>
                         </td>
                         <td className="px-8 py-5 text-sm">
@@ -1322,6 +1271,7 @@ const Students = () => {
       )}
 
       {/* ACTION MODALS */}
+      <AddStudentModal isOpen={showModal} onClose={() => setShowModal(false)} classes={classes} />
       <BulkImportModal 
         isOpen={showBulkImport}
         onClose={() => setShowBulkImport(false)}
