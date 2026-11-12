@@ -718,6 +718,27 @@ class DashboardAlert(models.Model):
 
 
 
+
+
+class BulkImportReceipt(models.Model):
+    """A durable school-scoped import idempotency claim for manually verified receipts.
+
+    This is not a payment-provider settlement record. Its source_reference is
+    the institution's external reference, not the generated BursarPro receipt.
+    """
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name='bulk_import_receipts')
+    source_reference = models.CharField(max_length=100)
+    payload_digest = models.CharField(max_length=64)
+    payment = models.OneToOneField(Payment, on_delete=models.PROTECT, related_name='bulk_import_receipt')
+    imported_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['school', 'source_reference'], name='uniq_bulk_ref_per_school')]
+
+    def __str__(self):
+        return f'Bulk reference {self.pk} for school {self.school_id}'
+
 # Import additional models for Phase 8
 try:
     from .reporting_models import ReportTemplate, ScheduledReport, ReportExecution, ReportCustomization

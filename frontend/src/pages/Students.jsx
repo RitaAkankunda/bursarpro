@@ -544,11 +544,7 @@ const Students = () => {
     }
   });
 
-  useEffect(() => {
-    if (classes.length > 0 && !selectedClass) {
-      setSelectedClass(classes[0].id);
-    }
-  }, [classes, selectedClass]);
+
 
   const { data: billingTerms = [] } = useQuery({
     queryKey: ['terms'],
@@ -909,6 +905,7 @@ const Students = () => {
                     onChange={(e) => setSelectedClass(e.target.value)}
                     className="bg-transparent text-xs font-bold uppercase tracking-wider outline-none cursor-pointer appearance-none pr-6 text-gray-800"
                   >
+                    <option value="">All Classes</option>
                     {classes.map(c => (
                       <option key={c.id} value={c.id} className="bg-white text-gray-800 text-gray-800">{c.name}</option>
                     ))}

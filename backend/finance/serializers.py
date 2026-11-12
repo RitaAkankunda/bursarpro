@@ -140,6 +140,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             'amount', 'payment_date', 'payment_method',
             'receipt_number', 'recorded_by', 'recorded_by_name', 'created_at'
         ]
+        read_only_fields = ['id', 'payment_date', 'receipt_number', 'recorded_by', 'created_at']
 
     def validate(self, attrs):
         """Guard new payment records against cross-school and invalid billing.
@@ -185,7 +186,8 @@ class PaymentSerializer(serializers.ModelSerializer):
         paid = Payment.objects.filter(student=student, term=term)
         if self.instance:
             paid = paid.exclude(pk=self.instance.pk)
-        received = paid.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        from .reversal_ledger import net_paid_total
+        received = net_paid_total(paid)
         if received + amount > fee.amount:
             raise serializers.ValidationError({'amount': 'Amount exceeds the remaining fee balance.'})
         return attrs
@@ -242,7 +244,9 @@ class StudentSerializer(serializers.ModelSerializer):
         # Sum all payments made by this student in the given term
         total_paid = Payment.objects.filter(
             student=obj, term_id=term_id
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        )
+        from .reversal_ledger import net_paid_total
+        total_paid = net_paid_total(total_paid)
 
         return float(fee_amount - total_paid)
 

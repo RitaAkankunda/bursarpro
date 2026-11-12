@@ -24,6 +24,7 @@ from .utils import send_payment_sms, render_to_pdf
 from .notification_service import SMSService, EmailService
 from .reports import ReportGenerator
 from .bulk_payment_service import BulkPaymentProcessor, BulkPaymentError
+from .reversal_ledger import effective_payments, net_paid_total
 from .sms_reminder_service import SMSReminderService
 from .dashboard_service import BursarDashboardService, HeadmasterDashboardService, TeacherDashboardService, ParentDashboardService
 from .search_service import StudentSearchService, PaymentSearchService, FeeStructureSearchService, GlobalSearchService
@@ -380,7 +381,7 @@ class StudentViewSet(viewsets.ModelViewSet):
             
             # Calculate total paid
             payments = Payment.objects.filter(student=student, term_id=term_id)
-            paid = payments.aggregate(total=Sum('amount'))['total'] or 0
+            paid = net_paid_total(payments)
             
             balance = expected - paid
             if balance > 0 and student.parent_phone:
@@ -394,6 +395,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get', 'post', 'head', 'options']  # no payment mutation/deletion
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated, BursarOrReadOnly]
     pagination_class = StandardResultsSetPagination
@@ -467,26 +469,42 @@ class PaymentViewSet(viewsets.ModelViewSet):
         return Response(stats)
 
     def perform_create(self, serializer):
-        payment = serializer.save(recorded_by=self.request.user)
-        try:
-            # Try the new SMS service first
-            SMSService.send_payment_confirmation(payment, payment.student.parent_phone)
-            
-            # create notification record in DB
-            from .models import Notification
-            Notification.objects.create(
-                user=self.request.user,
-                title="Payment Receipt Sent",
-                message=f"SMS receipt for {payment.receipt_number} dispatched to {payment.student.parent_name}.",
-                type='info'
-            )
-        except Exception as e:
-            # Fallback to old method if new service fails
+        from django.db import transaction
+        from .payment_posting_service import post_bursar_payment
+
+        data = serializer.validated_data
+        payment = post_bursar_payment(
+            user=self.request.user,
+            student_id=data['student'].pk,
+            term_id=data['term'].pk,
+            amount=data['amount'],
+            payment_method=data.get('payment_method', 'CASH'),
+        )
+        serializer.instance = payment
+
+        # External SMS must never execute within the posting transaction.
+        def notify_after_commit():
             try:
-                from .utils import send_payment_sms
-                send_payment_sms(payment)
+                SMSService.send_payment_confirmation(payment, payment.student.parent_phone)
             except Exception:
-                pass  # SMS failure should not block payment recording
+                import logging
+                logging.getLogger(__name__).exception('Payment %s notification failed', payment.pk)
+
+        transaction.on_commit(notify_after_commit)
+
+    @action(detail=True, methods=['get'], url_path='reversal-preview')
+    def reversal_preview(self, request, pk=None):
+        """Bursar-only reversal impact preview; does NOT execute a reversal."""
+        from rest_framework.exceptions import PermissionDenied
+        from .reversal_ledger import reversal_preview
+        role = UserRole.objects.filter(user=request.user, role='BURSAR').first()
+        if not role or not role.school_id:
+            raise PermissionDenied('School bursar permission required.')
+        payment = self.get_object()  # school-scoped queryset
+        if payment.student.school_id != role.school_id:
+            raise PermissionDenied('Payment is outside your school.')
+        result = reversal_preview(payment)
+        return Response({key: str(value) if isinstance(value, Decimal) else value for key, value in result.items()})
 
     @action(detail=True, methods=['get'], url_path='receipt')
     def receipt(self, request, pk=None):
@@ -536,7 +554,7 @@ class DashboardViewSet(viewsets.ViewSet):
         payment_qs = Payment.objects.filter(term=term, student__school_id=user_role.school_id)
         fee_qs = FeeStructure.objects.filter(term=term, class_level__school_id=user_role.school_id)
         total_students = student_qs.count()
-        total_collected = payment_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        total_collected = net_paid_total(payment_qs)
 
         # Compute with Decimal to avoid binary floating-point inaccuracies.
         total_expected = Decimal('0')
@@ -544,7 +562,7 @@ class DashboardViewSet(viewsets.ViewSet):
             count = student_qs.filter(class_level=fee.class_level).count()
             total_expected += fee.amount * count
 
-        paid_students = payment_qs.values('student_id').distinct().count()
+        paid_students = effective_payments(payment_qs).values('student_id').distinct().count()
         total_outstanding = total_expected - total_collected
         average_paid = (total_collected / paid_students) if paid_students else Decimal('0')
         collection_rate = (total_collected / total_expected * 100) if total_expected > 0 else Decimal('0')
@@ -567,66 +585,35 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def send_outstanding_alerts(self, request):
-        """Send SMS alerts to parents for outstanding fees"""
-        term_id = request.query_params.get('term_id')
-        
-        if not term_id:
-            return Response(
-                {'error': 'term_id parameter is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        """Send outstanding fee alerts only within the caller's school."""
+        from decimal import Decimal
+        role = UserRole.objects.select_related('school').filter(user=request.user).first()
+        if not role or role.role != 'BURSAR' or not role.school_id:
+            return Response({'error': 'School bursar access required.'}, status=status.HTTP_403_FORBIDDEN)
 
-        try:
-            term = Term.objects.get(id=term_id)
-        except Term.DoesNotExist:
-            return Response(
-                {'error': 'Term not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # Get all students in all schools (or filter by school)
+        term_id = request.query_params.get('term_id') or request.data.get('term_id')
+        term = Term.objects.filter(pk=term_id, school_id=role.school_id).first() if term_id else None
+        if term is None:
+            return Response({'error': 'Term not found in your school.'}, status=status.HTTP_404_NOT_FOUND)
         school_id = request.query_params.get('school_id')
-        students_qs = Student.objects.all()
-        if school_id:
-            students_qs = students_qs.filter(school_id=school_id)
+        if school_id and str(school_id) != str(role.school_id):
+            return Response({'error': 'School selection is not permitted.'}, status=status.HTTP_403_FORBIDDEN)
 
         sent_count = 0
         failed_count = 0
-        
-        for student in students_qs:
+        for student in Student.objects.filter(school_id=role.school_id).select_related('class_level'):
+            fee = FeeStructure.objects.filter(term=term, class_level=student.class_level).first()
+            if not fee:
+                continue
+            outstanding = fee.amount - net_paid_total(Payment.objects.filter(student=student, term=term))
+            if outstanding <= Decimal('0') or not student.parent_phone:
+                continue
             try:
-                # Get student's fee structure
-                fee = FeeStructure.objects.filter(
-                    term=term,
-                    class_level=student.class_level
-                ).first()
-                
-                if not fee:
-                    continue
-                
-                # Get total paid
-                paid = float(
-                    Payment.objects.filter(
-                        student=student,
-                        term=term
-                    ).aggregate(total=Sum('amount'))['total'] or 0
-                )
-                
-                outstanding = float(fee.amount) - paid
-                
-                # Send SMS only if there are outstanding fees
-                if outstanding > 0:
-                    SMSService.send_outstanding_fees_alert(student, outstanding)
-                    sent_count += 1
-            except Exception as e:
+                SMSService.send_outstanding_fees_alert(student, float(outstanding))
+                sent_count += 1
+            except Exception:
                 failed_count += 1
-
-        return Response({
-            'term_id': term_id,
-            'alerts_sent': sent_count,
-            'alerts_failed': failed_count,
-            'message': f'Sent {sent_count} outstanding fees alerts'
-        })
+        return Response({'term_id': term.pk, 'alerts_sent': sent_count, 'alerts_failed': failed_count})
 
 
 class StudentBalanceViewSet(viewsets.ViewSet):
@@ -686,8 +673,8 @@ class StudentBalanceViewSet(viewsets.ViewSet):
         total_paid = Payment.objects.filter(
             student=student,
             term=term
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        total_paid = float(total_paid)
+        )
+        total_paid = float(net_paid_total(total_paid))
 
         balance = expected_amount - total_paid
 
@@ -775,6 +762,7 @@ class StudentBalanceViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='pay_online')
     def pay_online(self, request):
         """Simulate an online payment via Student Portal Checkout"""
+        return Response({'error': 'Online payments disabled until provider settlement verification is implemented.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         parent_role = UserRole.objects.filter(user=request.user, role='PARENT').first()
         if not parent_role or not parent_role.student:
             return Response({'error': 'Unauthorized access'}, status=status.HTTP_403_FORBIDDEN)
@@ -900,7 +888,7 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
         payments = Payment.objects.filter(term=term, student__school=school)
 
-        total_collected = float(payments.aggregate(total=Sum('amount'))['total'] or 0)
+        total_collected = float(net_paid_total(payments))
 
         
 
@@ -930,7 +918,7 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
         # Students analysis
 
-        students_paid = payments.values('student').distinct().count()
+        students_paid = effective_payments(payments).values('student').distinct().count()
 
         students_unpaid = total_students - students_paid
 
@@ -954,7 +942,7 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
             student_paid = float(
 
-                payments.filter(student=student).aggregate(total=Sum('amount'))['total'] or 0
+                net_paid_total(payments.filter(student=student))
 
             )
 
@@ -994,7 +982,7 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
         # Payment trend (last 5 payments this term)
 
-        recent_payments = payments.order_by('-payment_date')[:5]
+        recent_payments = effective_payments(payments).order_by('-payment_date')[:5]
 
         payment_trend = [
 
@@ -1128,7 +1116,7 @@ class HeadmasterDashboardViewSet(viewsets.ViewSet):
 
             payments = Payment.objects.filter(student=student, term=term)
 
-            total_paid = float(payments.aggregate(total=Sum('amount'))['total'] or 0)
+            total_paid = float(net_paid_total(payments))
 
             expected = float(fee.amount)
 
@@ -1227,9 +1215,9 @@ class TeacherDashboardViewSet(viewsets.ViewSet):
                 student__in=students,
                 term=term
             )
-            students_paid = payments.values('student').distinct().count()
+            students_paid = effective_payments(payments).values('student').distinct().count()
             students_unpaid = total_students - students_paid
-            total_collected = float(payments.aggregate(total=Sum('amount'))['total'] or 0)
+            total_collected = float(net_paid_total(payments))
             
             classes_data.append({
                 'id': cls.id,
@@ -1500,60 +1488,33 @@ class BulkPaymentViewSet(viewsets.ViewSet):
             'total_amount': decimal
         }
         """
-        # Get file and term_id
+        # B2-H4-D1: manual receipt imports only, with explicit confirmation.
+        # This is not a way to credit unverified provider collections.
+        if request.data.get('confirmed_received') not in (True, 'true', 'True', '1', 1):
+            return Response({'error': 'Confirm that funds were independently received and verified before importing.'},
+                            status=status.HTTP_400_BAD_REQUEST)
         file_obj = request.FILES.get('file')
         term_id = request.data.get('term_id')
-        
-        if not file_obj:
-            return Response(
-                {'error': 'No file provided. Use "file" field in form data.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if not term_id:
-            return Response(
-                {'error': 'term_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check file type
-        filename = file_obj.name.lower()
-        if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
-            return Response(
-                {'error': 'File must be .xlsx or .xls format'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        if not file_obj or not term_id:
+            return Response({'error': 'file and term_id are required.'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            # Process the bulk payment
-            processor = BulkPaymentProcessor(file_obj, term_id, request.user)
-            results = processor.process()
-            
-            return Response(results, status=status.HTTP_200_OK)
-            
-        except BulkPaymentError as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        except Exception as e:
-            return Response(
-                {'error': f'Error processing file: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            result = BulkPaymentProcessor(file_obj, term_id, request.user).process()
+            return Response(result, status=status.HTTP_200_OK)
+        except (BulkPaymentError, ValueError) as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request):
         """Get bulk payment upload history (if implemented)"""
         return Response({
             'message': 'Use POST /upload/ endpoint to upload bulk payments',
-            'supported_formats': ['xlsx', 'xls'],
+            'supported_formats': ['xlsx'],
             'required_columns': ['Student ID', 'Amount', 'Receipt Number', 'Payment Method'],
-            'valid_payment_methods': ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_MONEY']
+            'valid_payment_methods': ['CASH', 'BANK_TRANSFER', 'MOBILE_MONEY']
         })
 
 
 # Payment Reconciliation ViewSets
-class BankStatementViewSet(viewsets.ModelViewSet):
+class BankStatementViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for managing bank statement uploads and processing.
     """
@@ -1564,7 +1525,7 @@ class BankStatementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter statements by user's school"""
         from .models import BankStatement
-        user_school = UserRole.objects.filter(user=self.request.user).first()
+        user_school = UserRole.objects.filter(user=self.request.user, role='BURSAR', school__isnull=False).first()
         if user_school:
             return BankStatement.objects.filter(school=user_school.school).order_by('-statement_date')
         return BankStatement.objects.none()
@@ -1575,46 +1536,15 @@ class BankStatementViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
     def process(self, request, pk=None):
-        """
-        Process an uploaded bank statement for reconciliation.
-        """
-        from .models import BankStatement
-        statement = self.get_object()
-        
-        if statement.status != 'PENDING':
-            return Response(
-                {'error': f'Statement already in {statement.get_status_display()} status'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            # Update status to processing
-            statement.status = 'PROCESSING'
-            statement.save()
-            
-            # TODO: Parse bank statement file and create reconciliation records
-            # This would typically involve:
-            # 1. Reading the bank statement file (CSV, Excel, etc.)
-            # 2. Extracting transaction data
-            # 3. Creating PaymentReconciliation records for each transaction
-            # 4. Running matching algorithm
-            
-            statement.status = 'PARTIAL'
-            statement.save()
-            
-            serializer = self.get_serializer(statement)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            statement.status = 'FAILED'
-            statement.save()
-            return Response(
-                {'error': f'Error processing statement: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        """Fail closed: legacy process never parsed a statement or matched a transaction."""
+        self.get_object()  # enforces school-scoped 404 for inaccessible statements
+        return Response(
+            {'error': 'Statement auto-processing is disabled until a verified parser and matching workflow is available.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
 
-class PaymentReconciliationViewSet(viewsets.ModelViewSet):
+class PaymentReconciliationViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for managing payment reconciliations and matching.
     """
@@ -1625,7 +1555,7 @@ class PaymentReconciliationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter reconciliations by user's school (through bank statement)"""
         from .models import PaymentReconciliation
-        user_school = UserRole.objects.filter(user=self.request.user).first()
+        user_school = UserRole.objects.filter(user=self.request.user, role='BURSAR', school__isnull=False).first()
         if user_school:
             return PaymentReconciliation.objects.filter(
                 bank_statement__school=user_school.school
@@ -1638,44 +1568,19 @@ class PaymentReconciliationViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
     def match_payment(self, request, pk=None):
-        """
-        Manually match a bank transaction to a payment.
-        """
-        from .models import PaymentReconciliation
-        reconciliation = self.get_object()
-        payment_id = request.data.get('payment_id')
-        confidence = request.data.get('confidence_score', 100)
-        notes = request.data.get('notes', '')
-        
-        if not payment_id:
-            return Response(
-                {'error': 'payment_id is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        """Only a school bursar may match an exact settled receipt to an existing bank row."""
+        from .reconciliation_matching_service import match_existing_payment
+        from rest_framework.exceptions import APIException
         try:
-            payment = Payment.objects.get(id=payment_id)
-            
-            # Update reconciliation
-            reconciliation.payment = payment
-            reconciliation.matched_amount = payment.amount_paid
-            reconciliation.amount_difference = abs(reconciliation.bank_amount - payment.amount_paid)
-            reconciliation.status = 'MANUAL_MATCHED'
-            reconciliation.confidence_score = confidence
-            reconciliation.notes = notes
-            reconciliation.matched_by = request.user
-            reconciliation.matched_at = datetime.now()
-            reconciliation.save()
-            
-            serializer = self.get_serializer(reconciliation)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-            
-        except Payment.DoesNotExist:
-            return Response(
-                {'error': 'Payment not found'},
-                status=status.HTTP_404_NOT_FOUND
+            record = match_existing_payment(
+                user=request.user, reconciliation_id=pk,
+                payment_id=request.data.get('payment_id'),
+                notes=request.data.get('notes', ''),
             )
-    
+        except (ValueError, TypeError):
+            return Response({'error': 'Invalid payment identifier.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(record).data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
     def unmatched(self, request):
         """Get all unmatched reconciliation records"""
@@ -1705,7 +1610,7 @@ class PaymentReconciliationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class ReconciliationDiscrepancyViewSet(viewsets.ModelViewSet):
+class ReconciliationDiscrepancyViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for managing reconciliation discrepancies.
     """
@@ -1716,7 +1621,7 @@ class ReconciliationDiscrepancyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter discrepancies by user's school (through reconciliation -> bank statement)"""
         from .models import ReconciliationDiscrepancy
-        user_school = UserRole.objects.filter(user=self.request.user).first()
+        user_school = UserRole.objects.filter(user=self.request.user, role='BURSAR', school__isnull=False).first()
         if user_school:
             return ReconciliationDiscrepancy.objects.filter(
                 reconciliation__bank_statement__school=user_school.school
@@ -1729,21 +1634,13 @@ class ReconciliationDiscrepancyViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsBursar])
     def resolve(self, request, pk=None):
-        """
-        Mark a discrepancy as resolved.
-        """
-        from .models import ReconciliationDiscrepancy
-        discrepancy = self.get_object()
-        resolution_notes = request.data.get('resolution_notes', '')
-        
-        discrepancy.is_resolved = True
-        discrepancy.resolution_notes = resolution_notes
-        discrepancy.resolved_at = datetime.now()
-        discrepancy.save()
-        
-        serializer = self.get_serializer(discrepancy)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
+        """Legacy discrepancy resolution lacks evidence/authorization approvals."""
+        self.get_object()  # applies school scoping
+        return Response(
+            {'error': 'Discrepancy resolution is disabled until verified reconciliation evidence is implemented.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsBursar])
     def unresolved(self, request):
         """Get all unresolved discrepancies"""
@@ -2544,6 +2441,11 @@ class WidgetCustomizationViewSet(viewsets.ViewSet):
 
 class AuditLogViewSet(viewsets.ViewSet):
     """ViewSet for audit log operations and compliance reporting"""
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied('Legacy audit endpoint disabled until tenant-scoped audit records are available.')
     
     permission_classes = [permissions.IsAuthenticated]
     

@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { assessPanel, makeEvidenceFilename } from '../src/features/finance/browserVerificationD6D9.mjs';
+const base = {panelPresent:true,selectedTermText:'Selected term #2',totalsVisible:true,alerts:[],refreshVisible:true};
+test('healthy selected-term view passes',()=> assert.equal(assessPanel(base).pass,true));
+test('missing panel fails',()=> assert.equal(assessPanel({...base,panelPresent:false}).pass,false));
+test('error while totals visible fails',()=> assert.equal(assessPanel({...base,alerts:['Unavailable']}).pass,false));
+test('internal exception leakage fails',()=> assert.equal(assessPanel({...base,totalsVisible:false,alerts:['Traceback: secret']}).pass,false));
+test('selected-term refresh missing fails',()=> assert.equal(assessPanel({...base,refreshVisible:false}).pass,false));
+test('evidence filename is path-safe',()=> assert.equal(makeEvidenceFilename('../term switch', '20261112'), '20261112-___term_switch.png'));

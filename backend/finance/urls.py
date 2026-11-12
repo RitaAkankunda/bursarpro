@@ -82,7 +82,10 @@ router.register(r'search', GlobalSearchViewSet, basename='global-search')
 # Widget Customization
 router.register(r'widget-customization', WidgetCustomizationViewSet, basename='widget-customization')
 
+from .financial_dashboard_read_api import RecordedCollectionsDashboardView
+
 urlpatterns = [
+    path('financial-dashboard/recorded/', RecordedCollectionsDashboardView.as_view(), name='recorded-collections-dashboard'),
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/parent-pin/', ParentPINAuthView.as_view(), name='parent-pin-auth'),
     path('', include(router.urls)),

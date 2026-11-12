@@ -141,7 +141,7 @@ class RefundService:
     @staticmethod
     @transaction.atomic
     def create_reversal(payment, reason, reversed_by):
-        """Create a payment reversal (complete removal)"""
+        """Create a reversal request; never delete the original payment."""
         
         if PaymentReversal.objects.filter(payment=payment).exists():
             raise ValueError("Payment already has an active reversal request")
@@ -193,7 +193,8 @@ class RefundService:
     @staticmethod
     @transaction.atomic
     def execute_reversal(reversal, executed_by):
-        """Execute the actual reversal (delete payment from system)"""
+        """Legacy execution remains blocked pending consistent accounting rollout."""
+        raise ValueError('Legacy reversal execution disabled: preserve original payments and post an audited compensating entry instead.')
         
         # Store payment data for audit
         payment = reversal.payment

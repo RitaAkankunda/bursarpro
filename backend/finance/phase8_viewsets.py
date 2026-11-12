@@ -21,6 +21,7 @@ from .phase8_serializers import (
 )
 from .reporting_service import ReportingService
 from .refund_service import RefundService
+from .models import UserRole
 from .currency_service import CurrencyService
 
 
@@ -247,10 +248,17 @@ class RefundViewSet(viewsets.ModelViewSet):
     queryset = Refund.objects.all()
     serializer_class = RefundSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'head', 'options']  # legacy financial writes blocked
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['payment', 'status', 'refund_method']
     ordering_fields = ['requested_at']
     ordering = ['-requested_at']
+
+    def get_queryset(self):
+        role = UserRole.objects.filter(user=self.request.user, role='BURSAR').first()
+        if not role or not role.school_id:
+            return super().get_queryset().none()
+        return super().get_queryset().filter(payment__student__school_id=role.school_id)
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
@@ -307,43 +315,56 @@ class PaymentReversalViewSet(viewsets.ModelViewSet):
     queryset = PaymentReversal.objects.all()
     serializer_class = PaymentReversalSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'post', 'head', 'options']  # POST exclusively controlled actions
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['payment', 'status']
     ordering_fields = ['requested_at']
     ordering = ['-requested_at']
+
+    def get_queryset(self):
+        role = UserRole.objects.filter(user=self.request.user, role='BURSAR').first()
+        if not role or not role.school_id:
+            return super().get_queryset().none()
+        return super().get_queryset().filter(payment__student__school_id=role.school_id)
     
+    def create(self, request, *args, **kwargs):
+        from rest_framework.exceptions import MethodNotAllowed
+        raise MethodNotAllowed('POST', detail='Use request-reversal action.')
+
+    @action(detail=False, methods=['post'], url_path='request-reversal')
+    def request_reversal(self, request):
+        from .reversal_approval_service import request_reversal
+        from rest_framework.exceptions import ValidationError
+        try:
+            result = request_reversal(request.user, request.data.get('payment_id'), request.data.get('reason'))
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
+        return Response(self.get_serializer(result).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
-        """Approve a reversal request"""
+        from .reversal_approval_service import approve_reversal
+        from rest_framework.exceptions import ValidationError
         reversal = self.get_object()
-        
         try:
-            RefundService.approve_reversal(reversal, request.user)
-            serializer = self.get_serializer(reversal)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({
-                'error': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-    
+            result = approve_reversal(request.user, reversal.pk)
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
+        return Response(self.get_serializer(result).data)
+
     @action(detail=True, methods=['post'])
     def execute(self, request, pk=None):
-        """Execute a reversal (delete payment)"""
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+        from django.conf import settings
+        if not getattr(settings, 'BURSARPRO_ENABLE_REVERSAL_EXECUTION', False):
+            raise PermissionDenied('Reversal execution disabled until the financial release gate passes.')
+        from .reversal_approval_service import execute_reversal
         reversal = self.get_object()
-        
-        if reversal.status != 'APPROVED':
-            return Response({
-                'error': 'Only approved reversals can be executed'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
         try:
-            RefundService.execute_reversal(reversal, request.user)
-            serializer = self.get_serializer(reversal)
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({
-                'error': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+            result = execute_reversal(request.user, reversal.pk)
+        except ValueError as exc:
+            raise ValidationError({'detail': str(exc)})
+        return Response(self.get_serializer(result).data)
 
 
 class RefundNotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -356,6 +377,12 @@ class RefundNotificationViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields = ['sent_at']
     ordering = ['-sent_at']
 
+    def get_queryset(self):
+        role = UserRole.objects.filter(user=self.request.user, role='BURSAR').first()
+        if not role or not role.school_id:
+            return super().get_queryset().none()
+        return super().get_queryset().filter(refund__payment__student__school_id=role.school_id)
+
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for audit logs (read-only)"""
@@ -367,3 +394,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['description']
     ordering_fields = ['timestamp']
     ordering = ['-timestamp']
+
+    def get_queryset(self):
+        # Legacy AuditLog has no trusted school FK: do not expose other schools' logs.
+        return super().get_queryset().none()

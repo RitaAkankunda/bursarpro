@@ -1,5 +1,6 @@
 import '../design-system/dashboard-shell.css';
 import { normalizeDashboardMetrics } from '../features/finance/domain/dashboardMetrics.js';
+import RecordedCollectionsPanel from '../features/finance/RecordedCollectionsPanel.jsx';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../services/api';
 import { useDashboard } from '../context/DashboardContext';
@@ -419,6 +420,8 @@ const Overview = () => {
             </div>
           </div>
         </motion.div>
+
+        <RecordedCollectionsPanel termId={localSelectedTerm} />
 
         {/* Main Stats Grid */}
         {statsLoading ? (
