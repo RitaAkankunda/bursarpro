@@ -241,6 +241,36 @@ class MultiCurrencyPaymentViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-created_at']
 
 
+    def get_queryset(self):
+        """Return only payments owned by one unambiguous bursar school."""
+        queryset = super().get_queryset()
+        user = self.request.user
+
+        if not user or not user.is_authenticated:
+            return queryset.none()
+
+        school_ids = list(
+            UserRole.objects.filter(
+                user=user,
+                role='BURSAR',
+                school_id__isnull=False,
+            )
+            .values_list('school_id', flat=True)
+            .distinct()[:2]
+        )
+
+        if len(school_ids) != 1:
+            return queryset.none()
+
+        school_id = school_ids[0]
+
+        return queryset.filter(
+            payment__student__school_id=school_id,
+            payment__term__school_id=school_id,
+        )
+
+
+
 # ==================== REFUND VIEWSETS ====================
 
 class RefundViewSet(viewsets.ModelViewSet):
