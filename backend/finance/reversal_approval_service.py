@@ -58,7 +58,7 @@ def approve_reversal(user, reversal_id):
     except (ValueError, TypeError):
         raise ValueError('A valid reversal ID is required.')
     School.objects.select_for_update().get(pk=school_id)
-    reversal = (PaymentReversal.objects.select_for_update().select_related('payment', 'requested_by')
+    reversal = (PaymentReversal.objects.select_for_update(of=('self',)).select_related('payment', 'requested_by')
                 .filter(pk=reversal_id, payment__student__school_id=school_id).first())
     if reversal is None:
         raise ValueError('Reversal not found in your school.')
@@ -105,7 +105,7 @@ def execute_reversal(user, reversal_id):
 
     # All posting paths use the school-level lock to serialize on PostgreSQL.
     School.objects.select_for_update().get(pk=school_id)
-    reversal = (PaymentReversal.objects.select_for_update()
+    reversal = (PaymentReversal.objects.select_for_update(of=('self',))
                 .select_related('payment', 'requested_by', 'approved_by')
                 .filter(pk=reversal_id, payment__student__school_id=school_id).first())
     if reversal is None:
